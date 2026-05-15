@@ -1051,7 +1051,7 @@ git commit -m "feat: add VaultWriter with markdown frontmatter read/write/search
 - Create: `src/GrootLinks/Services/LinkParser.cs`
 - Create: `tests/GrootLinks.Tests/Services/LinkParserTests.cs`
 
-- [ ] **Step 1: Write LinkParser tests**
+- [x] **Step 1: Write LinkParser tests**
 
 Create `tests/GrootLinks.Tests/Services/LinkParserTests.cs`:
 
@@ -1139,12 +1139,12 @@ public class LinkParserTests
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test --filter "LinkParserTests"`
 Expected: Compilation error — `LinkParser` does not exist.
 
-- [ ] **Step 3: Implement LinkParser**
+- [x] **Step 3: Implement LinkParser**
 
 Create `src/GrootLinks/Services/LinkParser.cs`:
 
@@ -1233,12 +1233,12 @@ public class LinkParser
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test --filter "LinkParserTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/GrootLinks/Services/LinkParser.cs tests/GrootLinks.Tests/Services/LinkParserTests.cs
@@ -1253,7 +1253,7 @@ git commit -m "feat: add LinkParser for URL content extraction"
 - Create: `src/GrootLinks/Services/TagClassifier.cs`
 - Create: `tests/GrootLinks.Tests/Services/TagClassifierTests.cs`
 
-- [ ] **Step 1: Write TagClassifier tests**
+- [x] **Step 1: Write TagClassifier tests**
 
 Create `tests/GrootLinks.Tests/Services/TagClassifierTests.cs`:
 
@@ -1322,12 +1322,12 @@ public class TagClassifierTests
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test --filter "TagClassifierTests"`
 Expected: Compilation error — `TagClassifier` does not exist.
 
-- [ ] **Step 3: Implement TagClassifier**
+- [x] **Step 3: Implement TagClassifier**
 
 Create `src/GrootLinks/Services/TagClassifier.cs`:
 
@@ -1414,12 +1414,12 @@ public partial class TagClassifier
 
 Note: The regex `\[(?:\s*"[^"]*"\s*,?\s*)*\]` matches JSON arrays of strings including empty arrays, single-element arrays, and multi-element arrays.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test --filter "TagClassifierTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/GrootLinks/Services/TagClassifier.cs tests/GrootLinks.Tests/Services/TagClassifierTests.cs
@@ -1438,7 +1438,7 @@ git commit -m "feat: add TagClassifier with Claude API integration"
 - Create: `src/GrootLinks/Tools/ReviewQueueTool.cs`
 - Modify: `src/GrootLinks/Program.cs`
 
-- [ ] **Step 1: Implement SaveLinkTool**
+- [x] **Step 1: Implement SaveLinkTool**
 
 Create `src/GrootLinks/Tools/SaveLinkTool.cs`:
 
@@ -1490,7 +1490,7 @@ public class SaveLinkTool
 }
 ```
 
-- [ ] **Step 2: Implement SearchLinksTool**
+- [x] **Step 2: Implement SearchLinksTool**
 
 Create `src/GrootLinks/Tools/SearchLinksTool.cs`:
 
@@ -1532,7 +1532,7 @@ public class SearchLinksTool
 }
 ```
 
-- [ ] **Step 3: Implement ListTagsTool**
+- [x] **Step 3: Implement ListTagsTool**
 
 Create `src/GrootLinks/Tools/ListTagsTool.cs`:
 
@@ -1560,7 +1560,7 @@ public class ListTagsTool
 }
 ```
 
-- [ ] **Step 4: Implement RetagLinkTool**
+- [x] **Step 4: Implement RetagLinkTool**
 
 Create `src/GrootLinks/Tools/RetagLinkTool.cs`:
 
@@ -1595,7 +1595,7 @@ public class RetagLinkTool
 }
 ```
 
-- [ ] **Step 5: Implement ReviewQueueTool**
+- [x] **Step 5: Implement ReviewQueueTool**
 
 Create `src/GrootLinks/Tools/ReviewQueueTool.cs`:
 
@@ -1635,7 +1635,7 @@ public class ReviewQueueTool
 }
 ```
 
-- [ ] **Step 6: Update Program.cs with correct DI registration**
+- [x] **Step 6: Update Program.cs with correct DI registration**
 
 Replace `src/GrootLinks/Program.cs`:
 
@@ -1689,12 +1689,12 @@ await host.RunAsync();
 
 Note: `AddHttpClient<LinkParser>()` registers `LinkParser` as a typed HTTP client, which means the DI container will automatically inject an `HttpClient` instance into its constructor.
 
-- [ ] **Step 7: Verify it builds**
+- [x] **Step 7: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/GrootLinks/Tools/ src/GrootLinks/Program.cs
