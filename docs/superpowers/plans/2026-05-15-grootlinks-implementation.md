@@ -1711,7 +1711,7 @@ git commit -m "feat: add MCP tools and wire DI for all services"
 - Create: `tools/migrate/NotionExporter.cs`
 - Create: `tools/migrate/TagAnalyzer.cs`
 
-- [ ] **Step 1: Create the migration project**
+- [x] **Step 1: Create the migration project**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -1723,7 +1723,7 @@ dotnet add package Anthropic
 dotnet add package System.Text.Json
 ```
 
-- [ ] **Step 2: Implement NotionExporter**
+- [x] **Step 2: Implement NotionExporter**
 
 Create `tools/migrate/NotionExporter.cs`:
 
@@ -1861,7 +1861,7 @@ public class NotionEntry
 }
 ```
 
-- [ ] **Step 3: Implement TagAnalyzer**
+- [x] **Step 3: Implement TagAnalyzer**
 
 Create `tools/migrate/TagAnalyzer.cs`:
 
@@ -2010,7 +2010,7 @@ public class TagAnalysisReport
 public record TagFrequency(string Tag, int Count);
 ```
 
-- [ ] **Step 4: Implement migration Program.cs**
+- [x] **Step 4: Implement migration Program.cs**
 
 Replace `tools/migrate/Program.cs`:
 
@@ -2110,12 +2110,12 @@ switch (command)
 }
 ```
 
-- [ ] **Step 5: Verify it builds**
+- [x] **Step 5: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tools/migrate/
@@ -2130,7 +2130,7 @@ git commit -m "feat: add Notion export, tag analysis, and taxonomy suggestion to
 - Create: `tools/migrate/VaultMigrator.cs`
 - Modify: `tools/migrate/Program.cs` (add `migrate` command)
 
-- [ ] **Step 1: Implement VaultMigrator**
+- [x] **Step 1: Implement VaultMigrator**
 
 Create `tools/migrate/VaultMigrator.cs`:
 
@@ -2300,7 +2300,7 @@ public class MigrationReport
 }
 ```
 
-- [ ] **Step 2: Add `migrate` command to Program.cs**
+- [x] **Step 2: Add `migrate` command to Program.cs**
 
 Add this case to the switch statement in `tools/migrate/Program.cs`, before the `default` case:
 
@@ -2344,12 +2344,12 @@ Add this case to the switch statement in `tools/migrate/Program.cs`, before the 
         break;
 ```
 
-- [ ] **Step 3: Verify it builds**
+- [x] **Step 3: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tools/migrate/VaultMigrator.cs tools/migrate/Program.cs
@@ -2365,7 +2365,7 @@ git commit -m "feat: add vault migrator with migration log and title-only fallba
 
 Note: `.claude/` is in `.gitignore` so this file is local-only.
 
-- [ ] **Step 1: Configure the MCP servers**
+- [x] **Step 1: Configure the MCP servers**
 
 Create/update `.claude/settings.json`:
 
@@ -2393,12 +2393,12 @@ Create/update `.claude/settings.json`:
 
 Note: Using absolute path for `GROOTLINKS_VAULT_PATH` to avoid working-directory ambiguity.
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite**
 
 Run: `dotnet test --verbosity normal`
 Expected: All tests pass.
 
-- [ ] **Step 3: Commit (tests only, settings is gitignored)**
+- [x] **Step 3: Commit (tests only, settings is gitignored)**
 
 ```bash
 git add -A
