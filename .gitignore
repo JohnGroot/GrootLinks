@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+
+# IDE
+.vs/
+.idea/
+*.swp
+
+# Secrets — NEVER commit tokens
+.env
+.claude/
+appsettings.*.json
+!appsettings.json
+
+# Notion export cache
+tools/migrate/export/
+
+# OS
+.DS_Store
+Thumbs.db
