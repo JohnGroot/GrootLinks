@@ -82,12 +82,50 @@ switch (command)
         Console.WriteLine("\n*** REVIEW tag_aliases.json before running migrate! ***");
         break;
 
+    case "migrate":
+        Console.WriteLine("Migrating to vault...");
+        var migrateData = JsonSerializer.Deserialize<List<NotionEntry>>(
+            await File.ReadAllTextAsync(exportPath))!;
+
+        var migrateTaxPath = Path.Combine(vaultPath, "_taxonomy", "tags.json");
+        var migrateAliasPath = Path.Combine(vaultPath, "_taxonomy", "tag_aliases.json");
+        var migrationLogPath = Path.Combine(exportDir, "migration_log.json");
+
+        var taxonomyService = new GrootLinks.Services.TaxonomyService(migrateTaxPath, migrateAliasPath);
+        var vaultWriter = new GrootLinks.Services.VaultWriter(vaultPath);
+
+        GrootLinks.Services.TagClassifier? classifier = null;
+        GrootLinks.Services.LinkParser? linkParser = null;
+        AnthropicClient? migrateAnthropicClient = null;
+        var classifyUntagged = args.Length > 1 && args[1] == "--classify-untagged";
+
+        if (classifyUntagged)
+        {
+            var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+                ?? throw new InvalidOperationException("ANTHROPIC_API_KEY required for --classify-untagged");
+            migrateAnthropicClient = new AnthropicClient(new ClientOptions { ApiKey = apiKey });
+            classifier = new GrootLinks.Services.TagClassifier(migrateAnthropicClient, taxonomyService);
+            linkParser = new GrootLinks.Services.LinkParser(new HttpClient());
+            Console.WriteLine("AI classification enabled for untagged entries.");
+        }
+
+        var migrator = new VaultMigrator(vaultWriter, taxonomyService, migrationLogPath, classifier);
+        var migrationReport = await migrator.MigrateAsync(
+            migrateData, linkParser, migrateAnthropicClient, Console.WriteLine);
+
+        Console.WriteLine($"\n=== Migration Complete ===");
+        Console.WriteLine($"Migrated: {migrationReport.Migrated}");
+        Console.WriteLine($"Skipped (no URL): {migrationReport.Skipped}");
+        Console.WriteLine($"Duplicates/Already migrated: {migrationReport.Duplicates}");
+        Console.WriteLine($"Needs Review: {migrationReport.NeedsReview}");
+        break;
+
     default:
         Console.WriteLine("Usage: dotnet run -- <command>");
-        Console.WriteLine("  export              - Export Notion database to JSON");
-        Console.WriteLine("  analyze             - Analyze exported tags");
-        Console.WriteLine("  suggest-taxonomy    - AI-suggest taxonomy expansion (review before applying)");
-        Console.WriteLine("  generate-aliases    - AI-generate tag alias mappings (review before migrating)");
-        Console.WriteLine("  migrate             - Write vault markdown files (see Task 8)");
+        Console.WriteLine("  export                              - Export Notion database to JSON");
+        Console.WriteLine("  analyze                             - Analyze exported tags");
+        Console.WriteLine("  suggest-taxonomy                    - AI-suggest taxonomy expansion (review before applying)");
+        Console.WriteLine("  generate-aliases                    - AI-generate tag alias mappings (review before migrating)");
+        Console.WriteLine("  migrate [--classify-untagged]       - Write vault markdown files (optionally AI-classify untagged)");
         break;
 }
