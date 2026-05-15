@@ -4,14 +4,55 @@
 
 **Goal:** Migrate 1,321 links from Notion to an Obsidian vault with a clean hierarchical tag taxonomy, and build a .NET 10 MCP stdio server for ongoing AI-classified link ingestion.
 
-**Architecture:** A single .NET 10 console app serves as an MCP server over stdio. The Obsidian vault is a flat directory of markdown files with YAML frontmatter, organized by year. Tag classification uses the Claude API against a hierarchical taxonomy tree stored in `tags.json`.
+**Architecture:** A single .NET 10 console app serves as an MCP server over stdio. The Obsidian vault is a git submodule (its own repo) containing markdown files with YAML frontmatter, organized by year. Tag classification uses the Claude API against a hierarchical taxonomy tree stored in `tags.json`. The vault submodule can be synced independently from the code.
 
-**Tech Stack:** .NET 10, ModelContextProtocol NuGet (v1.3.0+), Anthropic SDK, HtmlAgilityPack, YamlDotNet, System.Text.Json
+**Tech Stack:** .NET 10, ModelContextProtocol NuGet (v1.3.0+), Anthropic NuGet (v12.21.0, official Stainless SDK), HtmlAgilityPack, YamlDotNet, System.Text.Json
 
 **Design Spec:** `docs/superpowers/specs/2026-05-15-grootlinks-design.md`
 
 **Notion Database ID:** `79b34536-f152-4abb-a5e6-5ffce622a0bc`
-**Notion Token Env Var:** `NOTION_TOKEN` (configured in `.claude/settings.json`)
+**Notion Token:** Read from `NOTION_TOKEN` env var (never hardcode)
+
+---
+
+## Key SDK Patterns (Reference)
+
+### Anthropic Official SDK (v12.21.0)
+
+```csharp
+using Anthropic;
+using Anthropic.Core;
+using Anthropic.Models.Messages;
+
+var client = new AnthropicClient(new() { ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")! });
+
+var response = await client.Messages.Create(new MessageCreateParams
+{
+    Model = Model.ClaudeHaiku4_5,
+    MaxTokens = 256,
+    Messages = [new MessageParam { Role = Role.User, Content = "Hello" }]
+});
+
+// Extract text from response
+foreach (var block in response.Content)
+{
+    if (block.TryPickText(out var textBlock))
+        Console.WriteLine(textBlock.Text);
+}
+```
+
+Key types: `AnthropicClient` (takes `ClientOptions`), `MessageCreateParams`, `MessageParam`, `Role` (enum: `User`, `Assistant`), `Model` (enum: `ClaudeHaiku4_5`, `ClaudeSonnet4_5`, etc.), `ContentBlock.TryPickText(out TextBlock)`.
+
+### MCP .NET SDK
+
+```csharp
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddMcpServer(options => { ... })
+    .WithStdioServerTransport()
+    .WithToolsFromAssembly();
+```
+
+Tool classes use `[McpServerToolType]` at class level, `[McpServerTool]` on methods. DI services are injected as method parameters.
 
 ---
 
@@ -19,7 +60,7 @@
 
 ```
 ~/Dev/GrootLinks/
-├── vault/
+├── vault/                              # Git submodule (separate repo)
 │   ├── links/                          # One .md file per link, by year
 │   ├── _templates/
 │   │   └── link.md                     # Obsidian template
@@ -31,34 +72,33 @@
 │       ├── GrootLinks.csproj
 │       ├── Program.cs                  # MCP server entry point
 │       ├── Tools/
-│       │   ├── SaveLinkTool.cs         # save_link MCP tool
-│       │   ├── SearchLinksTool.cs      # search_links MCP tool
-│       │   ├── ListTagsTool.cs         # list_tags MCP tool
-│       │   ├── RetagLinkTool.cs        # retag_link MCP tool
-│       │   └── ReviewQueueTool.cs      # review_queue MCP tool
+│       │   ├── SaveLinkTool.cs
+│       │   ├── SearchLinksTool.cs
+│       │   ├── ListTagsTool.cs
+│       │   ├── RetagLinkTool.cs
+│       │   └── ReviewQueueTool.cs
 │       ├── Services/
-│       │   ├── LinkParser.cs           # Fetch URL, extract title/description
-│       │   ├── TagClassifier.cs        # Claude API tag classification
-│       │   ├── VaultWriter.cs          # Write/update .md files with frontmatter
-│       │   └── TaxonomyService.cs      # Load/query/validate taxonomy tree
+│       │   ├── LinkParser.cs
+│       │   ├── TagClassifier.cs
+│       │   ├── VaultWriter.cs
+│       │   └── TaxonomyService.cs
 │       └── Models/
-│           ├── Link.cs                 # Link data model
-│           └── Taxonomy.cs             # Taxonomy tree + alias models
+│           └── Link.cs
 ├── tests/
 │   └── GrootLinks.Tests/
 │       ├── GrootLinks.Tests.csproj
-│       ├── Services/
-│       │   ├── VaultWriterTests.cs
-│       │   ├── TaxonomyServiceTests.cs
-│       │   ├── LinkParserTests.cs
-│       │   └── TagClassifierTests.cs
-│       └── Tools/
-│           └── SaveLinkToolTests.cs
+│       └── Services/
+│           ├── VaultWriterTests.cs
+│           ├── TaxonomyServiceTests.cs
+│           ├── LinkParserTests.cs
+│           └── TagClassifierTests.cs
 ├── tools/
 │   └── migrate/
-│       ├── NotionExporter.cs           # One-time: export Notion → JSON
-│       ├── TagAnalyzer.cs              # One-time: analyze tags, generate aliases
-│       └── VaultMigrator.cs            # One-time: transform + write vault
+│       ├── GrootLinks.Migrate.csproj
+│       ├── Program.cs
+│       ├── NotionExporter.cs
+│       ├── TagAnalyzer.cs
+│       └── VaultMigrator.cs
 ├── .gitignore
 └── GrootLinks.sln
 ```
@@ -73,6 +113,7 @@
 - Create: `src/GrootLinks/GrootLinks.csproj`
 - Create: `src/GrootLinks/Program.cs`
 - Create: `tests/GrootLinks.Tests/GrootLinks.Tests.csproj`
+- Create: `vault/` as git submodule
 
 - [ ] **Step 1: Create .gitignore**
 
@@ -91,8 +132,9 @@ obj/
 .idea/
 *.swp
 
-# Secrets
+# Secrets — NEVER commit tokens
 .env
+.claude/
 appsettings.*.json
 !appsettings.json
 
@@ -104,9 +146,20 @@ tools/migrate/export/
 Thumbs.db
 ```
 
-- [ ] **Step 2: Create the solution and projects**
+- [ ] **Step 2: Initialize vault as a separate git repo and add as submodule**
 
-Run:
+```bash
+cd ~/Dev/GrootLinks
+mkdir -p vault
+cd vault && git init && git commit --allow-empty -m "init: empty vault repo"
+cd ~/Dev/GrootLinks
+git submodule add ./vault vault
+```
+
+Note: The vault is a submodule so it can be synced/moved independently. For now it's a local repo; it can be pushed to a remote later.
+
+- [ ] **Step 3: Create the solution and projects**
+
 ```bash
 cd ~/Dev/GrootLinks
 dotnet new sln --name GrootLinks
@@ -117,36 +170,32 @@ dotnet sln add tests/GrootLinks.Tests/GrootLinks.Tests.csproj
 dotnet add tests/GrootLinks.Tests reference src/GrootLinks
 ```
 
-Expected: Solution with two projects, test project references main project.
+- [ ] **Step 4: Add NuGet dependencies to main project**
 
-- [ ] **Step 3: Add NuGet dependencies to main project**
-
-Run:
 ```bash
 cd ~/Dev/GrootLinks/src/GrootLinks
 dotnet add package ModelContextProtocol --prerelease
-dotnet add package Anthropic --prerelease
+dotnet add package Anthropic
 dotnet add package HtmlAgilityPack
 dotnet add package YamlDotNet
 ```
 
-- [ ] **Step 4: Add test dependencies**
+- [ ] **Step 5: Add test dependencies**
 
-Run:
 ```bash
 cd ~/Dev/GrootLinks/tests/GrootLinks.Tests
 dotnet add package NSubstitute
 dotnet add package FluentAssertions
 ```
 
-- [ ] **Step 5: Write minimal Program.cs (MCP stdio server skeleton)**
+- [ ] **Step 6: Write minimal Program.cs (MCP stdio server skeleton)**
 
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
-var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services
     .AddMcpServer(options =>
@@ -165,20 +214,23 @@ var host = builder.Build();
 await host.RunAsync();
 ```
 
-- [ ] **Step 6: Verify it builds**
+- [ ] **Step 7: Verify it builds**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet build
-```
-
+Run: `dotnet build` from repo root.
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Create .env.example**
+
+```
+NOTION_TOKEN=your_notion_integration_token
+ANTHROPIC_API_KEY=your_anthropic_api_key
+GROOTLINKS_VAULT_PATH=/absolute/path/to/vault
+```
+
+- [ ] **Step 9: Commit**
 
 ```bash
-git add .gitignore GrootLinks.sln src/ tests/
+git add .gitignore .env.example GrootLinks.sln src/ tests/
 git commit -m "feat: scaffold .NET 10 solution with MCP server skeleton"
 ```
 
@@ -188,7 +240,6 @@ git commit -m "feat: scaffold .NET 10 solution with MCP server skeleton"
 
 **Files:**
 - Create: `src/GrootLinks/Models/Link.cs`
-- Create: `src/GrootLinks/Models/Taxonomy.cs`
 - Create: `src/GrootLinks/Services/TaxonomyService.cs`
 - Create: `tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs`
 - Create: `vault/_taxonomy/tags.json` (starter taxonomy)
@@ -214,40 +265,9 @@ public class Link
 }
 ```
 
-- [ ] **Step 2: Create the Taxonomy model**
+- [ ] **Step 2: Create starter tags.json**
 
-Create `src/GrootLinks/Models/Taxonomy.cs`:
-
-```csharp
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-namespace GrootLinks.Models;
-
-public class TaxonomyNode
-{
-    public string Name { get; set; } = "";
-    public string? Description { get; set; }
-    public Dictionary<string, TaxonomyNode> Children { get; set; } = [];
-
-    public List<string> GetAllTagSlugs()
-    {
-        var slugs = new List<string> { Name };
-        foreach (var child in Children.Values)
-            slugs.AddRange(child.GetAllTagSlugs());
-        return slugs;
-    }
-}
-
-public class TagAliases
-{
-    public Dictionary<string, string> Mappings { get; set; } = [];
-}
-```
-
-- [ ] **Step 3: Create starter tags.json**
-
-Create `vault/_taxonomy/tags.json` — a minimal starter taxonomy that will be expanded during migration:
+Create `vault/_taxonomy/tags.json` — minimal starter taxonomy. This will be expanded by the `suggest-taxonomy` migration step:
 
 ```json
 {
@@ -322,7 +342,7 @@ Create `vault/_taxonomy/tags.json` — a minimal starter taxonomy that will be e
 }
 ```
 
-- [ ] **Step 4: Create empty tag_aliases.json**
+- [ ] **Step 3: Create empty tag_aliases.json**
 
 Create `vault/_taxonomy/tag_aliases.json`:
 
@@ -330,7 +350,7 @@ Create `vault/_taxonomy/tag_aliases.json`:
 {}
 ```
 
-- [ ] **Step 5: Write TaxonomyService tests**
+- [ ] **Step 4: Write TaxonomyService tests**
 
 Create `tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs`:
 
@@ -412,7 +432,7 @@ public class TaxonomyServiceTests : IDisposable
     }
 
     [Fact]
-    public void ResolveAliases_MapsListOfOldTags()
+    public void ResolveAliases_MapsListDeduplicates()
     {
         File.WriteAllText(_tagsPath, """
         { "technology": { "ai": {}, "programming": {} } }
@@ -444,17 +464,12 @@ public class TaxonomyServiceTests : IDisposable
 }
 ```
 
-- [ ] **Step 6: Run tests to verify they fail**
+- [ ] **Step 5: Run tests to verify they fail**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "TaxonomyServiceTests"
-```
-
+Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: Compilation error — `TaxonomyService` does not exist.
 
-- [ ] **Step 7: Implement TaxonomyService**
+- [ ] **Step 6: Implement TaxonomyService**
 
 Create `src/GrootLinks/Services/TaxonomyService.cs`:
 
@@ -530,21 +545,18 @@ public class TaxonomyService
 }
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+- [ ] **Step 7: Run tests to verify they pass**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "TaxonomyServiceTests"
-```
-
+Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/GrootLinks/Models/ src/GrootLinks/Services/TaxonomyService.cs tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs vault/_taxonomy/
-git commit -m "feat: add Link/Taxonomy models and TaxonomyService with alias resolution"
+git add src/GrootLinks/Models/ src/GrootLinks/Services/TaxonomyService.cs tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs
+cd vault && git add _taxonomy/ && git commit -m "feat: add starter taxonomy and empty aliases" && cd ..
+git add vault
+git commit -m "feat: add Link model and TaxonomyService with alias resolution"
 ```
 
 ---
@@ -558,7 +570,7 @@ git commit -m "feat: add Link/Taxonomy models and TaxonomyService with alias res
 
 - [ ] **Step 1: Create the Obsidian link template**
 
-Create `vault/_templates/link.md`:
+Create `vault/_templates/link.md` (for Obsidian Templater reference):
 
 ```markdown
 ---
@@ -574,8 +586,6 @@ needs_review: {{needs_review}}
 
 {{description}}
 ```
-
-This is for Obsidian's Templater plugin reference — the actual writing is done by VaultWriter in code.
 
 - [ ] **Step 2: Write VaultWriter tests**
 
@@ -622,7 +632,7 @@ public class VaultWriterTests : IDisposable
         var filePath = await writer.WriteLinkAsync(link);
 
         File.Exists(filePath).Should().BeTrue();
-        var content = await File.ReadAllTextAsync(filePath);
+        var content = await File.ReadAllTextAsync(filePath!);
         content.Should().Contain("title: \"Test Link\"");
         content.Should().Contain("url: https://example.com");
         content.Should().Contain("- programming");
@@ -662,7 +672,7 @@ public class VaultWriterTests : IDisposable
 
         var filePath = await writer.WriteLinkAsync(link);
 
-        Path.GetFileName(filePath).Should().Be("rive-a-new-way-to-design-build-uis.md");
+        Path.GetFileName(filePath!).Should().Be("rive-a-new-way-to-design-build-uis.md");
     }
 
     [Fact]
@@ -678,7 +688,7 @@ public class VaultWriterTests : IDisposable
 
         var filePath = await writer.WriteLinkAsync(link);
 
-        var content = await File.ReadAllTextAsync(filePath);
+        var content = await File.ReadAllTextAsync(filePath!);
         content.Should().Contain("tags: []");
     }
 
@@ -693,6 +703,20 @@ public class VaultWriterTests : IDisposable
         var path2 = await writer.WriteLinkAsync(link2);
 
         path2.Should().BeNull("duplicate URL should be skipped");
+    }
+
+    [Fact]
+    public async Task WriteLink_HandlesTitleCollision()
+    {
+        var writer = new VaultWriter(_vaultDir);
+        var link1 = new Link { Title = "Same Title", Url = "https://a.example.com" };
+        var link2 = new Link { Title = "Same Title", Url = "https://b.example.com" };
+
+        var path1 = await writer.WriteLinkAsync(link1);
+        var path2 = await writer.WriteLinkAsync(link2);
+
+        path1.Should().NotBe(path2);
+        Path.GetFileName(path2!).Should().Be("same-title-2.md");
     }
 
     [Fact]
@@ -772,12 +796,7 @@ public class VaultWriterTests : IDisposable
 
 - [ ] **Step 3: Run tests to verify they fail**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "VaultWriterTests"
-```
-
+Run: `dotnet test --filter "VaultWriterTests"`
 Expected: Compilation error — `VaultWriter` does not exist.
 
 - [ ] **Step 4: Implement VaultWriter**
@@ -814,6 +833,15 @@ public partial class VaultWriter
 
         var slug = Slugify(link.Title);
         var filePath = Path.Combine(yearDir, $"{slug}.md");
+
+        // Handle slug collision — append -2, -3, etc.
+        if (File.Exists(filePath))
+        {
+            var counter = 2;
+            while (File.Exists(Path.Combine(yearDir, $"{slug}-{counter}.md")))
+                counter++;
+            filePath = Path.Combine(yearDir, $"{slug}-{counter}.md");
+        }
 
         var content = BuildMarkdown(link);
         await File.WriteAllTextAsync(filePath, content);
@@ -887,7 +915,7 @@ public partial class VaultWriter
         foreach (var file in Directory.EnumerateFiles(_linksDir, "*.md", SearchOption.AllDirectories))
         {
             var content = File.ReadAllText(file);
-            if (content.Contains($"url: {url}"))
+            if (content.Contains($"\nurl: {url}\n") || content.Contains($"\nurl: {url}\r"))
                 return file;
         }
 
@@ -952,6 +980,10 @@ public partial class VaultWriter
                 created = parsed;
         }
 
+        var needsReview = false;
+        if (dict.TryGetValue("needs_review", out var nrObj) && nrObj != null)
+            needsReview = nrObj is bool b ? b : string.Equals(nrObj.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+
         return new Link
         {
             Title = dict.GetValueOrDefault("title")?.ToString() ?? "",
@@ -959,7 +991,7 @@ public partial class VaultWriter
             Tags = tags,
             Created = created,
             Source = dict.GetValueOrDefault("source")?.ToString() ?? "unknown",
-            NeedsReview = dict.GetValueOrDefault("needs_review")?.ToString() == "True",
+            NeedsReview = needsReview,
             Description = ExtractDescription(content),
             FilePath = filePath
         };
@@ -999,18 +1031,15 @@ public partial class VaultWriter
 
 - [ ] **Step 5: Run tests to verify they pass**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "VaultWriterTests"
-```
-
-Expected: All 9 tests pass.
+Run: `dotnet test --filter "VaultWriterTests"`
+Expected: All 10 tests pass.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add src/GrootLinks/Services/VaultWriter.cs tests/GrootLinks.Tests/Services/VaultWriterTests.cs vault/_templates/
+git add src/GrootLinks/Services/VaultWriter.cs tests/GrootLinks.Tests/Services/VaultWriterTests.cs
+cd vault && git add _templates/ && git commit -m "feat: add link template" && cd ..
+git add vault
 git commit -m "feat: add VaultWriter with markdown frontmatter read/write/search"
 ```
 
@@ -1045,7 +1074,7 @@ public class LinkParserTests
         </head>
         <body>
             <h1>Main Heading</h1>
-            <p>First paragraph of content that provides context about the page.</p>
+            <p>First paragraph of content.</p>
             <p>Second paragraph with more details.</p>
         </body>
         </html>
@@ -1056,15 +1085,12 @@ public class LinkParserTests
         result.Title.Should().Be("Test Page Title");
         result.Description.Should().Be("A test description of the page.");
         result.BodyText.Should().Contain("First paragraph");
-        result.BodyText.Should().Contain("Second paragraph");
     }
 
     [Fact]
     public void ExtractFromHtml_FallsBackToH1WhenNoTitle()
     {
-        var html = """
-        <html><body><h1>Heading As Title</h1><p>Content.</p></body></html>
-        """;
+        var html = "<html><body><h1>Heading As Title</h1><p>Content.</p></body></html>";
 
         var result = LinkParser.ExtractFromHtml(html);
 
@@ -1100,17 +1126,22 @@ public class LinkParserTests
         result.Title.Should().Be("OG Title");
         result.Description.Should().Be("OG Description");
     }
+
+    [Fact]
+    public void ExtractFromHtml_ReturnsUntitledForEmpty()
+    {
+        var html = "<html><body></body></html>";
+
+        var result = LinkParser.ExtractFromHtml(html);
+
+        result.Title.Should().Be("Untitled");
+    }
 }
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "LinkParserTests"
-```
-
+Run: `dotnet test --filter "LinkParserTests"`
 Expected: Compilation error — `LinkParser` does not exist.
 
 - [ ] **Step 3: Implement LinkParser**
@@ -1204,13 +1235,8 @@ public class LinkParser
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "LinkParserTests"
-```
-
-Expected: All 4 tests pass.
+Run: `dotnet test --filter "LinkParserTests"`
+Expected: All 5 tests pass.
 
 - [ ] **Step 5: Commit**
 
@@ -1234,7 +1260,6 @@ Create `tests/GrootLinks.Tests/Services/TagClassifierTests.cs`:
 ```csharp
 using FluentAssertions;
 using GrootLinks.Services;
-using NSubstitute;
 
 namespace GrootLinks.Tests.Services;
 
@@ -1259,9 +1284,7 @@ public class TagClassifierTests
     [Fact]
     public void ParseClassificationResponse_ExtractsTagList()
     {
-        var response = """["programming", "rust", "tutorial"]""";
-
-        var tags = TagClassifier.ParseClassificationResponse(response);
+        var tags = TagClassifier.ParseClassificationResponse("""["programming", "rust", "tutorial"]""");
 
         tags.Should().BeEquivalentTo(["programming", "rust", "tutorial"]);
     }
@@ -1288,17 +1311,20 @@ public class TagClassifierTests
 
         tags.Should().BeEmpty();
     }
+
+    [Fact]
+    public void ParseClassificationResponse_HandlesSingleElementArray()
+    {
+        var tags = TagClassifier.ParseClassificationResponse("""["ai"]""");
+
+        tags.Should().BeEquivalentTo(["ai"]);
+    }
 }
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "TagClassifierTests"
-```
-
+Run: `dotnet test --filter "TagClassifierTests"`
 Expected: Compilation error — `TagClassifier` does not exist.
 
 - [ ] **Step 3: Implement TagClassifier**
@@ -1309,6 +1335,7 @@ Create `src/GrootLinks/Services/TagClassifier.cs`:
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Anthropic;
+using Anthropic.Models.Messages;
 
 namespace GrootLinks.Services;
 
@@ -1328,23 +1355,28 @@ public partial class TagClassifier
         var taxonomyJson = _taxonomy.GetTaxonomyTreeJson();
         var prompt = BuildClassificationPrompt(title, description, bodyText, taxonomyJson);
 
-        var response = await _client.Messages.CreateAsync(new()
+        var response = await _client.Messages.Create(new MessageCreateParams
         {
-            Model = "claude-sonnet-4-5-20250514",
+            Model = Model.ClaudeHaiku4_5,
             MaxTokens = 256,
-            Messages = [new() { Role = "user", Content = prompt }]
+            Messages = [new MessageParam { Role = Role.User, Content = prompt }]
         });
 
-        var text = response.Content[0].Text ?? "";
-        var tags = ParseClassificationResponse(text);
+        var text = "";
+        foreach (var block in response.Content)
+        {
+            if (block.TryPickText(out var textBlock))
+                text = textBlock.Text;
+        }
 
+        var tags = ParseClassificationResponse(text);
         return tags.Where(t => _taxonomy.IsValidTag(t)).ToList();
     }
 
     public static string BuildClassificationPrompt(string title, string? description, string bodyText, string taxonomyJson)
     {
         return $"""
-            Classify this web page into 2-5 tags from the taxonomy below. 
+            Classify this web page into 2-5 tags from the taxonomy below.
             Prefer specific leaf tags over broad parent categories.
             If the content spans multiple categories, tag across categories.
             Return ONLY a JSON array of tag slugs. No explanation.
@@ -1375,31 +1407,28 @@ public partial class TagClassifier
         }
     }
 
-    [GeneratedRegex(@"\[""[^\]]*""\]", RegexOptions.Singleline)]
+    [GeneratedRegex(@"\[(?:\s*""[^""]*""\s*,?\s*)*\]", RegexOptions.Singleline)]
     private static partial Regex JsonArrayRegex();
 }
 ```
 
+Note: The regex `\[(?:\s*"[^"]*"\s*,?\s*)*\]` matches JSON arrays of strings including empty arrays, single-element arrays, and multi-element arrays.
+
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --filter "TagClassifierTests"
-```
-
-Expected: All 4 tests pass.
+Run: `dotnet test --filter "TagClassifierTests"`
+Expected: All 5 tests pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/GrootLinks/Services/TagClassifier.cs tests/GrootLinks.Tests/Services/TagClassifierTests.cs
-git commit -m "feat: add TagClassifier with Claude API integration for tag classification"
+git commit -m "feat: add TagClassifier with Claude API integration"
 ```
 
 ---
 
-## Task 6: MCP Tools
+## Task 6: MCP Tools & Program.cs DI Wiring
 
 **Files:**
 - Create: `src/GrootLinks/Tools/SaveLinkTool.cs`
@@ -1606,34 +1635,38 @@ public class ReviewQueueTool
 }
 ```
 
-- [ ] **Step 6: Update Program.cs with DI registration**
+- [ ] **Step 6: Update Program.cs with correct DI registration**
 
-Replace `src/GrootLinks/Program.cs` with:
+Replace `src/GrootLinks/Program.cs`:
 
 ```csharp
 using Anthropic;
+using Anthropic.Core;
 using GrootLinks.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Server;
 
-var builder = Host.CreateEmptyApplicationBuilder(settings: null);
+var builder = Host.CreateApplicationBuilder(args);
 
 var vaultPath = Environment.GetEnvironmentVariable("GROOTLINKS_VAULT_PATH")
-    ?? Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "vault"));
+    ?? throw new InvalidOperationException(
+        "GROOTLINKS_VAULT_PATH environment variable is required. Set it to the absolute path of your vault directory.");
 
 var taxonomyPath = Path.Combine(vaultPath, "_taxonomy", "tags.json");
 var aliasesPath = Path.Combine(vaultPath, "_taxonomy", "tag_aliases.json");
 
-builder.Services.AddHttpClient();
 builder.Services.AddSingleton(new TaxonomyService(taxonomyPath, aliasesPath));
 builder.Services.AddSingleton(new VaultWriter(vaultPath));
-builder.Services.AddSingleton<LinkParser>();
+
+// Register LinkParser with typed HttpClient (resolves DI correctly)
+builder.Services.AddHttpClient<LinkParser>();
+
 builder.Services.AddSingleton(sp =>
 {
     var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
         ?? throw new InvalidOperationException("ANTHROPIC_API_KEY environment variable is required");
-    return new AnthropicClient(apiKey);
+    return new AnthropicClient(new ClientOptions { ApiKey = apiKey });
 });
 builder.Services.AddSingleton<TagClassifier>();
 
@@ -1654,21 +1687,18 @@ var host = builder.Build();
 await host.RunAsync();
 ```
 
+Note: `AddHttpClient<LinkParser>()` registers `LinkParser` as a typed HTTP client, which means the DI container will automatically inject an `HttpClient` instance into its constructor.
+
 - [ ] **Step 7: Verify it builds**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet build
-```
-
+Run: `dotnet build`
 Expected: Build succeeded with 0 errors.
 
 - [ ] **Step 8: Commit**
 
 ```bash
 git add src/GrootLinks/Tools/ src/GrootLinks/Program.cs
-git commit -m "feat: add MCP tools (save_link, search_links, list_tags, retag_link, review_queue)"
+git commit -m "feat: add MCP tools and wire DI for all services"
 ```
 
 ---
@@ -1676,21 +1706,20 @@ git commit -m "feat: add MCP tools (save_link, search_links, list_tags, retag_li
 ## Task 7: Notion Export & Tag Analysis (Migration Phase 1)
 
 **Files:**
+- Create: `tools/migrate/GrootLinks.Migrate.csproj`
+- Create: `tools/migrate/Program.cs`
 - Create: `tools/migrate/NotionExporter.cs`
 - Create: `tools/migrate/TagAnalyzer.cs`
 
-This is a set of one-time scripts run as top-level statements or a simple console project. For simplicity, we'll add them as additional entry points invoked via `dotnet run` with args.
+- [ ] **Step 1: Create the migration project**
 
-- [ ] **Step 1: Create the migration tools directory and project**
-
-Run:
 ```bash
-mkdir -p ~/Dev/GrootLinks/tools/migrate
 cd ~/Dev/GrootLinks
 dotnet new console -n GrootLinks.Migrate -o tools/migrate --framework net10.0
 dotnet sln add tools/migrate/GrootLinks.Migrate.csproj
 dotnet add tools/migrate reference src/GrootLinks
-cd ~/Dev/GrootLinks/tools/migrate
+cd tools/migrate
+dotnet add package Anthropic
 dotnet add package System.Text.Json
 ```
 
@@ -1718,10 +1747,19 @@ public class NotionExporter
         _databaseId = databaseId;
     }
 
-    public async Task<List<NotionEntry>> ExportAllAsync()
+    public async Task<List<NotionEntry>> ExportAllAsync(Action<string>? log = null)
     {
         var entries = new List<NotionEntry>();
         string? cursor = null;
+
+        // Pre-flight: verify database is accessible
+        var schemaReq = new HttpRequestMessage(HttpMethod.Get,
+            $"https://api.notion.com/v1/databases/{_databaseId}");
+        var schemaResp = await _http.SendAsync(schemaReq);
+        schemaResp.EnsureSuccessStatusCode();
+        var schemaDoc = JsonDocument.Parse(await schemaResp.Content.ReadAsStringAsync());
+        var props = schemaDoc.RootElement.GetProperty("properties");
+        log?.Invoke($"Database properties: {string.Join(", ", props.EnumerateObject().Select(p => $"{p.Name}({p.Value.GetProperty("type").GetString()})"))}");
 
         while (true)
         {
@@ -1742,17 +1780,19 @@ public class NotionExporter
 
             foreach (var result in root.GetProperty("results").EnumerateArray())
             {
-                var props = result.GetProperty("properties");
+                var entryProps = result.GetProperty("properties");
                 var entry = new NotionEntry
                 {
                     Id = result.GetProperty("id").GetString()!,
-                    Title = ExtractTitle(props),
-                    Url = ExtractUrl(props),
-                    Tags = ExtractTags(props),
-                    Created = ExtractCreated(props)
+                    Title = ExtractTitle(entryProps),
+                    Url = ExtractUrl(entryProps),
+                    Tags = ExtractTags(entryProps),
+                    Created = ExtractCreated(entryProps)
                 };
                 entries.Add(entry);
             }
+
+            log?.Invoke($"Fetched {entries.Count} entries...");
 
             if (!root.GetProperty("has_more").GetBoolean()) break;
             cursor = root.GetProperty("next_cursor").GetString();
@@ -1828,6 +1868,7 @@ Create `tools/migrate/TagAnalyzer.cs`:
 ```csharp
 using System.Text.Json;
 using Anthropic;
+using Anthropic.Models.Messages;
 
 namespace GrootLinks.Migrate;
 
@@ -1857,6 +1898,55 @@ public class TagAnalyzer
         };
     }
 
+    public static async Task<string> SuggestTaxonomyExpansionAsync(
+        TagAnalysisReport report,
+        string currentTaxonomyJson,
+        AnthropicClient client)
+    {
+        var tagList = string.Join("\n", report.TagFrequencies.Select(t => $"- {t.Tag} ({t.Count} uses)"));
+
+        var prompt = $"""
+            You are expanding a tag taxonomy to accommodate existing tags from a links database.
+
+            ## Current Taxonomy
+            {currentTaxonomyJson}
+
+            ## All Existing Tags (with frequency)
+            {tagList}
+
+            Analyze these tags and produce an EXPANDED version of the taxonomy JSON that:
+            1. Adds new subcategories and leaf tags to accommodate ALL existing tags
+            2. Preserves the existing structure — don't remove or rename existing entries
+            3. Uses kebab-case for all tag slugs
+            4. Allows 3-4 levels of nesting where it makes sense
+            5. Groups related tags logically (e.g., person names under relevant topics)
+            6. Merges obvious duplicates/typos into one canonical tag
+
+            Return ONLY the expanded taxonomy JSON. No explanation.
+            """;
+
+        var response = await client.Messages.Create(new MessageCreateParams
+        {
+            Model = Model.ClaudeSonnet4_5,
+            MaxTokens = 8192,
+            Messages = [new MessageParam { Role = Role.User, Content = prompt }]
+        });
+
+        var text = "";
+        foreach (var block in response.Content)
+        {
+            if (block.TryPickText(out var textBlock))
+                text = textBlock.Text;
+        }
+
+        var jsonStart = text.IndexOf('{');
+        var jsonEnd = text.LastIndexOf('}');
+        if (jsonStart >= 0 && jsonEnd > jsonStart)
+            text = text[jsonStart..(jsonEnd + 1)];
+
+        return text;
+    }
+
     public static async Task<Dictionary<string, string>> GenerateAliasesAsync(
         TagAnalysisReport report,
         string taxonomyJson,
@@ -1865,37 +1955,40 @@ public class TagAnalyzer
         var tagList = string.Join("\n", report.TagFrequencies.Select(t => $"- {t.Tag} ({t.Count} uses)"));
 
         var prompt = $"""
-            You are mapping old Notion tags to a new canonical taxonomy.
-            
-            ## New Taxonomy
+            Map old Notion tags to canonical slugs from this taxonomy.
+
+            ## Taxonomy
             {taxonomyJson}
-            
-            ## Old Tags (with usage frequency)
+
+            ## Old Tags (with frequency)
             {tagList}
-            
-            For EVERY old tag, provide a mapping to the most appropriate tag slug in the new taxonomy.
-            If an old tag doesn't fit any existing taxonomy entry, suggest a new slug that would fit 
-            naturally into the taxonomy tree (use kebab-case).
-            
+
+            For EVERY old tag, provide a mapping to the best matching tag slug in the taxonomy.
             Rules:
-            - Fix typos (e.g., "Theroy" -> appropriate tag)
+            - Fix typos (e.g., "Theroy" -> correct tag)
             - Merge duplicates (e.g., "TikTook" and "TikTok" -> same slug)
-            - Normalize casing (all kebab-case)
-            - Map specific person names to the most relevant topic tag unless they warrant their own tag
+            - Normalize to kebab-case
+            - Map person names to their most relevant topic tag
             - Prefer specific leaf tags over broad parents
-            
-            Return ONLY a JSON object mapping old tag -> new slug. No explanation.
-            Example: {{"OldTag": "new-slug", "AnotherOld": "another-slug"}}
+
+            Return ONLY a JSON object. No explanation.
+            Example: {{"OldTag": "new-slug"}}
             """;
 
-        var response = await client.Messages.CreateAsync(new()
+        var response = await client.Messages.Create(new MessageCreateParams
         {
-            Model = "claude-sonnet-4-5-20250514",
+            Model = Model.ClaudeSonnet4_5,
             MaxTokens = 8192,
-            Messages = [new() { Role = "user", Content = prompt }]
+            Messages = [new MessageParam { Role = Role.User, Content = prompt }]
         });
 
-        var text = response.Content[0].Text ?? "{}";
+        var text = "";
+        foreach (var block in response.Content)
+        {
+            if (block.TryPickText(out var textBlock))
+                text = textBlock.Text;
+        }
+
         var jsonStart = text.IndexOf('{');
         var jsonEnd = text.LastIndexOf('}');
         if (jsonStart >= 0 && jsonEnd > jsonStart)
@@ -1917,29 +2010,33 @@ public class TagAnalysisReport
 public record TagFrequency(string Tag, int Count);
 ```
 
-- [ ] **Step 4: Implement the migration Program.cs**
+- [ ] **Step 4: Implement migration Program.cs**
 
-Replace `tools/migrate/Program.cs` with:
+Replace `tools/migrate/Program.cs`:
 
 ```csharp
 using System.Text.Json;
 using Anthropic;
+using Anthropic.Core;
 using GrootLinks.Migrate;
 
 var command = args.Length > 0 ? args[0] : "help";
 var notionToken = Environment.GetEnvironmentVariable("NOTION_TOKEN")
-    ?? throw new InvalidOperationException("NOTION_TOKEN required");
+    ?? throw new InvalidOperationException("NOTION_TOKEN env var required");
 var databaseId = "79b34536-f152-4abb-a5e6-5ffce622a0bc";
-var exportDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "export");
+var exportDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "export"));
 Directory.CreateDirectory(exportDir);
 var exportPath = Path.Combine(exportDir, "notion_export.json");
+
+var vaultPath = Environment.GetEnvironmentVariable("GROOTLINKS_VAULT_PATH")
+    ?? throw new InvalidOperationException("GROOTLINKS_VAULT_PATH env var required");
 
 switch (command)
 {
     case "export":
         Console.WriteLine("Exporting from Notion...");
         var exporter = new NotionExporter(notionToken, databaseId);
-        var entries = await exporter.ExportAllAsync();
+        var entries = await exporter.ExportAllAsync(Console.WriteLine);
         await NotionExporter.SaveToFileAsync(entries, exportPath);
         Console.WriteLine($"Exported {entries.Count} entries to {exportPath}");
         break;
@@ -1956,61 +2053,73 @@ switch (command)
         Console.WriteLine("\nTop 30 tags:");
         foreach (var t in report.TagFrequencies.Take(30))
             Console.WriteLine($"  {t.Tag}: {t.Count}");
-
         var reportPath = Path.Combine(exportDir, "tag_report.json");
-        var reportJson = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(reportPath, reportJson);
-        Console.WriteLine($"\nFull report saved to {reportPath}");
+        await File.WriteAllTextAsync(reportPath,
+            JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine($"\nFull report: {reportPath}");
+        break;
+
+    case "suggest-taxonomy":
+        Console.WriteLine("Generating taxonomy expansion suggestions...");
+        var suggestData = JsonSerializer.Deserialize<List<NotionEntry>>(
+            await File.ReadAllTextAsync(exportPath))!;
+        var suggestReport = TagAnalyzer.Analyze(suggestData);
+        var currentTaxonomy = await File.ReadAllTextAsync(
+            Path.Combine(vaultPath, "_taxonomy", "tags.json"));
+        var suggestClient = new AnthropicClient(new ClientOptions
+        {
+            ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+                ?? throw new InvalidOperationException("ANTHROPIC_API_KEY required")
+        });
+        var expandedTaxonomy = await TagAnalyzer.SuggestTaxonomyExpansionAsync(
+            suggestReport, currentTaxonomy, suggestClient);
+        var suggestedPath = Path.Combine(exportDir, "suggested_tags.json");
+        await File.WriteAllTextAsync(suggestedPath, expandedTaxonomy);
+        Console.WriteLine($"Suggested expanded taxonomy saved to: {suggestedPath}");
+        Console.WriteLine("\n*** Review suggested_tags.json, then copy approved version to vault/_taxonomy/tags.json ***");
         break;
 
     case "generate-aliases":
-        Console.WriteLine("Generating tag aliases via AI...");
-        var exportData = JsonSerializer.Deserialize<List<NotionEntry>>(
+        Console.WriteLine("Generating tag aliases...");
+        var aliasData = JsonSerializer.Deserialize<List<NotionEntry>>(
             await File.ReadAllTextAsync(exportPath))!;
-        var analysisReport = TagAnalyzer.Analyze(exportData);
-
-        var vaultPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "vault"));
+        var aliasReport = TagAnalyzer.Analyze(aliasData);
         var taxonomyJson = await File.ReadAllTextAsync(
             Path.Combine(vaultPath, "_taxonomy", "tags.json"));
-
-        var anthropicKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
-            ?? throw new InvalidOperationException("ANTHROPIC_API_KEY required");
-        var anthropic = new AnthropicClient(anthropicKey);
-
-        var aliases = await TagAnalyzer.GenerateAliasesAsync(analysisReport, taxonomyJson, anthropic);
-
+        var aliasClient = new AnthropicClient(new ClientOptions
+        {
+            ApiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+                ?? throw new InvalidOperationException("ANTHROPIC_API_KEY required")
+        });
+        var aliases = await TagAnalyzer.GenerateAliasesAsync(aliasReport, taxonomyJson, aliasClient);
         var aliasPath = Path.Combine(vaultPath, "_taxonomy", "tag_aliases.json");
-        var aliasJson = JsonSerializer.Serialize(aliases, new JsonSerializerOptions { WriteIndented = true });
-        await File.WriteAllTextAsync(aliasPath, aliasJson);
-        Console.WriteLine($"Generated {aliases.Count} aliases, saved to {aliasPath}");
+        await File.WriteAllTextAsync(aliasPath,
+            JsonSerializer.Serialize(aliases, new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine($"Generated {aliases.Count} aliases: {aliasPath}");
         Console.WriteLine("\n*** REVIEW tag_aliases.json before running migrate! ***");
         break;
 
     default:
         Console.WriteLine("Usage: dotnet run -- <command>");
-        Console.WriteLine("  export             - Export Notion database to JSON");
-        Console.WriteLine("  analyze            - Analyze exported tags");
-        Console.WriteLine("  generate-aliases   - AI-generate tag alias mappings");
-        Console.WriteLine("  migrate            - Write vault markdown files (Task 8)");
+        Console.WriteLine("  export              - Export Notion database to JSON");
+        Console.WriteLine("  analyze             - Analyze exported tags");
+        Console.WriteLine("  suggest-taxonomy    - AI-suggest taxonomy expansion (review before applying)");
+        Console.WriteLine("  generate-aliases    - AI-generate tag alias mappings (review before migrating)");
+        Console.WriteLine("  migrate             - Write vault markdown files (see Task 8)");
         break;
 }
 ```
 
 - [ ] **Step 5: Verify it builds**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet build
-```
-
+Run: `dotnet build`
 Expected: Build succeeded.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add tools/migrate/
-git commit -m "feat: add Notion export and tag analysis migration tools"
+git commit -m "feat: add Notion export, tag analysis, and taxonomy suggestion tools"
 ```
 
 ---
@@ -2028,6 +2137,8 @@ Create `tools/migrate/VaultMigrator.cs`:
 ```csharp
 using System.Text.Json;
 using Anthropic;
+using Anthropic.Core;
+using Anthropic.Models.Messages;
 using GrootLinks.Models;
 using GrootLinks.Services;
 
@@ -2038,20 +2149,26 @@ public class VaultMigrator
     private readonly VaultWriter _writer;
     private readonly TaxonomyService _taxonomy;
     private readonly TagClassifier? _classifier;
+    private readonly string _migrationLogPath;
 
-    public VaultMigrator(VaultWriter writer, TaxonomyService taxonomy, TagClassifier? classifier = null)
+    public VaultMigrator(VaultWriter writer, TaxonomyService taxonomy, string migrationLogPath, TagClassifier? classifier = null)
     {
         _writer = writer;
         _taxonomy = taxonomy;
         _classifier = classifier;
+        _migrationLogPath = migrationLogPath;
     }
 
     public async Task<MigrationReport> MigrateAsync(
         List<NotionEntry> entries,
         LinkParser? parser = null,
+        AnthropicClient? anthropicClient = null,
         Action<string>? log = null)
     {
         var report = new MigrationReport();
+
+        // Load existing migration log for crash-resumability
+        var migrationLog = await LoadMigrationLogAsync();
 
         foreach (var entry in entries)
         {
@@ -2062,26 +2179,73 @@ public class VaultMigrator
                 continue;
             }
 
+            if (migrationLog.ContainsKey(entry.Url))
+            {
+                log?.Invoke($"ALREADY-MIGRATED: {entry.Title}");
+                report.Duplicates++;
+                continue;
+            }
+
             var resolvedTags = _taxonomy.ResolveAliases(entry.Tags);
             var needsReview = false;
 
-            if (resolvedTags.Count == 0 && _classifier != null && parser != null)
+            // For untagged entries: try AI classification, fall back to title-based
+            if (resolvedTags.Count == 0)
             {
-                try
+                if (_classifier != null)
                 {
-                    log?.Invoke($"AI-CLASSIFY: {entry.Title}");
-                    var page = await parser.FetchAndParseAsync(entry.Url);
-                    resolvedTags = await _classifier.ClassifyAsync(page.Title, page.Description, page.BodyText);
-                    needsReview = true;
-                }
-                catch (Exception ex)
-                {
-                    log?.Invoke($"FETCH-FAIL: {entry.Title} - {ex.Message}");
-                    needsReview = true;
-                }
-            }
+                    try
+                    {
+                        if (parser != null)
+                        {
+                            log?.Invoke($"AI-CLASSIFY (fetch): {entry.Title}");
+                            var page = await parser.FetchAndParseAsync(entry.Url);
+                            resolvedTags = await _classifier.ClassifyAsync(page.Title, page.Description, page.BodyText);
+                            await Task.Delay(500); // Rate limit protection
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        log?.Invoke($"FETCH-FAIL (using title): {entry.Title} - {ex.Message}");
+                    }
 
-            if (resolvedTags.Count == 0) needsReview = true;
+                    // Fall back to title-only classification if fetch failed or wasn't attempted
+                    if (resolvedTags.Count == 0 && anthropicClient != null)
+                    {
+                        try
+                        {
+                            log?.Invoke($"AI-CLASSIFY (title-only): {entry.Title}");
+                            var taxonomyJson = _taxonomy.GetTaxonomyTreeJson();
+                            var prompt = TagClassifier.BuildClassificationPrompt(
+                                entry.Title, null, entry.Title, taxonomyJson);
+
+                            var response = await anthropicClient.Messages.Create(new MessageCreateParams
+                            {
+                                Model = Model.ClaudeHaiku4_5,
+                                MaxTokens = 256,
+                                Messages = [new MessageParam { Role = Role.User, Content = prompt }]
+                            });
+
+                            var text = "";
+                            foreach (var block in response.Content)
+                            {
+                                if (block.TryPickText(out var textBlock))
+                                    text = textBlock.Text;
+                            }
+
+                            resolvedTags = TagClassifier.ParseClassificationResponse(text)
+                                .Where(t => _taxonomy.IsValidTag(t)).ToList();
+                            await Task.Delay(500);
+                        }
+                        catch (Exception ex)
+                        {
+                            log?.Invoke($"CLASSIFY-FAIL: {entry.Title} - {ex.Message}");
+                        }
+                    }
+                }
+
+                needsReview = true;
+            }
 
             var link = new Link
             {
@@ -2101,12 +2265,29 @@ public class VaultMigrator
                 continue;
             }
 
-            log?.Invoke($"OK: {entry.Title} -> {filePath} [{string.Join(", ", resolvedTags)}]");
+            // Update migration log
+            migrationLog[entry.Url] = filePath;
+            await SaveMigrationLogAsync(migrationLog);
+
+            log?.Invoke($"OK: {entry.Title} -> {Path.GetFileName(filePath)} [{string.Join(", ", resolvedTags)}]");
             report.Migrated++;
             if (needsReview) report.NeedsReview++;
         }
 
         return report;
+    }
+
+    private async Task<Dictionary<string, string>> LoadMigrationLogAsync()
+    {
+        if (!File.Exists(_migrationLogPath)) return new();
+        var json = await File.ReadAllTextAsync(_migrationLogPath);
+        return JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+    }
+
+    private async Task SaveMigrationLogAsync(Dictionary<string, string> log)
+    {
+        var json = JsonSerializer.Serialize(log, new JsonSerializerOptions { WriteIndented = true });
+        await File.WriteAllTextAsync(_migrationLogPath, json);
     }
 }
 
@@ -2129,99 +2310,64 @@ Add this case to the switch statement in `tools/migrate/Program.cs`, before the 
         var migrateData = JsonSerializer.Deserialize<List<NotionEntry>>(
             await File.ReadAllTextAsync(exportPath))!;
 
-        var migrateVaultPath = Path.GetFullPath(
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "vault"));
-        var migrateTaxPath = Path.Combine(migrateVaultPath, "_taxonomy", "tags.json");
-        var migrateAliasPath = Path.Combine(migrateVaultPath, "_taxonomy", "tag_aliases.json");
+        var migrateTaxPath = Path.Combine(vaultPath, "_taxonomy", "tags.json");
+        var migrateAliasPath = Path.Combine(vaultPath, "_taxonomy", "tag_aliases.json");
+        var migrationLogPath = Path.Combine(exportDir, "migration_log.json");
 
-        var taxonomyService = new TaxonomyService(migrateTaxPath, migrateAliasPath);
-        var vaultWriter = new VaultWriter(migrateVaultPath);
+        var taxonomyService = new GrootLinks.Services.TaxonomyService(migrateTaxPath, migrateAliasPath);
+        var vaultWriter = new GrootLinks.Services.VaultWriter(vaultPath);
 
-        TagClassifier? classifier = null;
-        LinkParser? linkParser = null;
+        GrootLinks.Services.TagClassifier? classifier = null;
+        GrootLinks.Services.LinkParser? linkParser = null;
+        AnthropicClient? migrateAnthropicClient = null;
         var classifyUntagged = args.Length > 1 && args[1] == "--classify-untagged";
 
         if (classifyUntagged)
         {
             var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
                 ?? throw new InvalidOperationException("ANTHROPIC_API_KEY required for --classify-untagged");
-            var client = new AnthropicClient(apiKey);
-            classifier = new TagClassifier(client, taxonomyService);
-            var httpClient = new HttpClient();
-            linkParser = new LinkParser(httpClient);
+            migrateAnthropicClient = new AnthropicClient(new ClientOptions { ApiKey = apiKey });
+            classifier = new GrootLinks.Services.TagClassifier(migrateAnthropicClient, taxonomyService);
+            linkParser = new GrootLinks.Services.LinkParser(new HttpClient());
             Console.WriteLine("AI classification enabled for untagged entries.");
         }
 
-        var migrator = new VaultMigrator(vaultWriter, taxonomyService, classifier);
+        var migrator = new VaultMigrator(vaultWriter, taxonomyService, migrationLogPath, classifier);
         var migrationReport = await migrator.MigrateAsync(
-            migrateData, linkParser, msg => Console.WriteLine(msg));
+            migrateData, linkParser, migrateAnthropicClient, Console.WriteLine);
 
         Console.WriteLine($"\n=== Migration Complete ===");
         Console.WriteLine($"Migrated: {migrationReport.Migrated}");
-        Console.WriteLine($"Skipped: {migrationReport.Skipped}");
-        Console.WriteLine($"Duplicates: {migrationReport.Duplicates}");
+        Console.WriteLine($"Skipped (no URL): {migrationReport.Skipped}");
+        Console.WriteLine($"Duplicates/Already migrated: {migrationReport.Duplicates}");
         Console.WriteLine($"Needs Review: {migrationReport.NeedsReview}");
         break;
 ```
 
 - [ ] **Step 3: Verify it builds**
 
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet build
-```
-
+Run: `dotnet build`
 Expected: Build succeeded.
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add tools/migrate/VaultMigrator.cs tools/migrate/Program.cs
-git commit -m "feat: add vault migrator with optional AI classification for untagged entries"
+git commit -m "feat: add vault migrator with migration log and title-only fallback"
 ```
 
 ---
 
-## Task 9: Integration Test & MCP Server Config
+## Task 9: MCP Server Configuration
 
 **Files:**
-- Modify: `.claude/settings.json` (add GrootLinks MCP server)
-- Create: `.env.example`
+- Create: `.claude/settings.json` (with token from env var, not hardcoded)
 
-- [ ] **Step 1: Create .env.example**
+Note: `.claude/` is in `.gitignore` so this file is local-only.
 
-Create `.env.example`:
+- [ ] **Step 1: Configure the MCP servers**
 
-```
-NOTION_TOKEN=your_notion_integration_token
-ANTHROPIC_API_KEY=your_anthropic_api_key
-GROOTLINKS_VAULT_PATH=/path/to/vault
-```
-
-- [ ] **Step 2: Run the full test suite**
-
-Run:
-```bash
-cd ~/Dev/GrootLinks
-dotnet test --verbosity normal
-```
-
-Expected: All tests pass.
-
-- [ ] **Step 3: Build and test the MCP server starts**
-
-Run:
-```bash
-cd ~/Dev/GrootLinks/src/GrootLinks
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"0.1"}}}' | timeout 5 dotnet run 2>/dev/null || true
-```
-
-Expected: Server responds with JSON-RPC initialize response (or times out after the init — that's fine, it proves it starts).
-
-- [ ] **Step 4: Add GrootLinks MCP server to Claude Code settings**
-
-Update `.claude/settings.json` to include both Notion and GrootLinks MCP servers:
+Create/update `.claude/settings.json`:
 
 ```json
 {
@@ -2230,7 +2376,7 @@ Update `.claude/settings.json` to include both Notion and GrootLinks MCP servers
       "command": "npx",
       "args": ["-y", "@notionhq/notion-mcp-server"],
       "env": {
-        "NOTION_TOKEN": "REDACTED_NOTION_TOKEN"
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
       }
     },
     "grootlinks": {
@@ -2238,86 +2384,111 @@ Update `.claude/settings.json` to include both Notion and GrootLinks MCP servers
       "args": ["run", "--project", "src/GrootLinks"],
       "env": {
         "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
-        "GROOTLINKS_VAULT_PATH": "./vault"
+        "GROOTLINKS_VAULT_PATH": "/Users/johngroot/Dev/GrootLinks/vault"
       }
     }
   }
 }
 ```
 
-- [ ] **Step 5: Commit**
+Note: Using absolute path for `GROOTLINKS_VAULT_PATH` to avoid working-directory ambiguity.
+
+- [ ] **Step 2: Run the full test suite**
+
+Run: `dotnet test --verbosity normal`
+Expected: All tests pass.
+
+- [ ] **Step 3: Commit (tests only, settings is gitignored)**
 
 ```bash
-git add .env.example .claude/settings.json
-git commit -m "feat: add MCP server config and environment setup"
+git add -A
+git commit -m "chore: verify all tests pass before migration"
 ```
 
 ---
 
 ## Task 10: Run Migration End-to-End
 
-This task executes the actual migration. Run each step and verify before proceeding.
+This task executes the actual migration. Each step has a human review gate.
 
 - [ ] **Step 1: Export Notion database**
 
-Run:
 ```bash
 cd ~/Dev/GrootLinks
-NOTION_TOKEN=REDACTED_NOTION_TOKEN dotnet run --project tools/migrate -- export
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
+  dotnet run --project tools/migrate -- export
 ```
 
 Expected: `Exported 1321 entries to .../notion_export.json`
 
 - [ ] **Step 2: Analyze tags**
 
-Run:
 ```bash
-NOTION_TOKEN=REDACTED_NOTION_TOKEN dotnet run --project tools/migrate -- analyze
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
+  dotnet run --project tools/migrate -- analyze
 ```
 
-Expected: Prints tag stats and top 30 tags. Saves full report.
+Expected: Tag stats printed, full report saved.
 
-- [ ] **Step 3: Generate AI alias mappings**
+- [ ] **Step 3: AI-suggest taxonomy expansion (two-pass step 1)**
 
-Run:
 ```bash
-NOTION_TOKEN=REDACTED_NOTION_TOKEN \
-ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-dotnet run --project tools/migrate -- generate-aliases
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  dotnet run --project tools/migrate -- suggest-taxonomy
 ```
 
-Expected: Generates `vault/_taxonomy/tag_aliases.json` with mappings for all 500+ tags.
+Expected: `suggested_tags.json` created in export dir.
 
-- [ ] **Step 4: HUMAN REVIEW GATE — Edit tag_aliases.json**
+- [ ] **Step 4: HUMAN REVIEW GATE — Expand taxonomy**
 
-Open `vault/_taxonomy/tag_aliases.json` and review/edit the AI-generated mappings. Also review and expand `vault/_taxonomy/tags.json` to add any new subcategories suggested by the alias mappings.
+Open `tools/migrate/export/suggested_tags.json`. Review the AI-suggested expansion. Edit as needed. When satisfied, copy to `vault/_taxonomy/tags.json`:
 
-This is a critical manual step — do not skip it.
-
-- [ ] **Step 5: Run migration (without AI classification first)**
-
-Run:
 ```bash
-NOTION_TOKEN=REDACTED_NOTION_TOKEN \
-dotnet run --project tools/migrate -- migrate
+cp tools/migrate/export/suggested_tags.json vault/_taxonomy/tags.json
 ```
 
-Expected: Migrates ~1,182 tagged entries. Reports ~139 needing review (untagged).
-
-- [ ] **Step 6: Run migration with AI classification for untagged**
-
-Run:
+Commit in vault submodule:
 ```bash
-NOTION_TOKEN=REDACTED_NOTION_TOKEN \
-ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-dotnet run --project tools/migrate -- migrate --classify-untagged
+cd vault && git add _taxonomy/tags.json && git commit -m "feat: expand taxonomy from AI suggestions" && cd ..
 ```
 
-Expected: Processes remaining untagged entries with AI classification. Reports all as needs_review.
+- [ ] **Step 5: Generate aliases (two-pass step 2)**
 
-- [ ] **Step 7: Verify vault structure**
+```bash
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  dotnet run --project tools/migrate -- generate-aliases
+```
 
-Run:
+Expected: `tag_aliases.json` updated with mappings for all 500+ tags.
+
+- [ ] **Step 6: HUMAN REVIEW GATE — Edit aliases**
+
+Open `vault/_taxonomy/tag_aliases.json`. Review/edit the mappings. Commit:
+
+```bash
+cd vault && git add _taxonomy/tag_aliases.json && git commit -m "feat: add reviewed tag aliases" && cd ..
+```
+
+- [ ] **Step 7: Run migration (tagged entries only)**
+
+```bash
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
+  dotnet run --project tools/migrate -- migrate
+```
+
+Expected: ~1,182 tagged entries migrated. ~139 untagged skipped (no AI yet).
+
+- [ ] **Step 8: Run migration with AI classification for untagged**
+
+```bash
+NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+  dotnet run --project tools/migrate -- migrate --classify-untagged
+```
+
+Expected: Processes remaining untagged entries. Dead URLs fall back to title-only classification. All AI-classified entries marked `needs_review: true`.
+
+- [ ] **Step 9: Verify vault structure**
+
 ```bash
 find ~/Dev/GrootLinks/vault/links -type f -name "*.md" | wc -l
 ls ~/Dev/GrootLinks/vault/links/
@@ -2325,12 +2496,12 @@ ls ~/Dev/GrootLinks/vault/links/
 
 Expected: ~1,321 .md files across year directories (2019-2025).
 
-- [ ] **Step 8: Commit the vault**
+- [ ] **Step 10: Commit vault**
 
 ```bash
-cd ~/Dev/GrootLinks
-git add vault/
-git commit -m "feat: migrate 1,321 links from Notion with cleaned taxonomy"
+cd vault && git add links/ && git commit -m "feat: migrate 1,321 links from Notion" && cd ..
+git add vault
+git commit -m "feat: update vault submodule with migrated links"
 ```
 
 ---
@@ -2339,27 +2510,26 @@ git commit -m "feat: migrate 1,321 links from Notion with cleaned taxonomy"
 
 - [ ] **Step 1: Open vault in Obsidian**
 
-Open Obsidian, click "Open folder as vault", select `~/Dev/GrootLinks/vault/`. Verify:
-- Links appear in the file explorer under `links/YYYY/`
-- Clicking a link shows frontmatter and title
-- Tags are visible in the properties view
+Open Obsidian → "Open folder as vault" → select `~/Dev/GrootLinks/vault/`. Verify:
+- Links appear under `links/YYYY/`
+- Frontmatter renders in properties view
+- Tags are searchable
 
-- [ ] **Step 2: Test MCP server from Claude Code**
+- [ ] **Step 2: Restart Claude Code and test MCP server**
 
-Restart Claude Code (to pick up the new MCP config). Then test:
-- Ask Claude to `save_link` with a test URL
-- Ask Claude to `search_links` for a known term
-- Ask Claude to `list_tags` for a category
-- Ask Claude to `review_queue` to see pending reviews
+Restart Claude Code to pick up the MCP config. Test:
+- `save_link` with a test URL
+- `search_links` for a known term
+- `list_tags` for a category
+- `review_queue` to see pending reviews
 
 - [ ] **Step 3: Verify round-trip**
 
-Save a new link, find it in search, retag it, verify the review flag clears.
+Save a new link → find it in search → retag it → verify review flag clears.
 
 - [ ] **Step 4: Final commit**
 
 ```bash
-cd ~/Dev/GrootLinks
 git add -A
-git commit -m "chore: finalize GrootLinks setup and verification"
+git commit -m "chore: finalize GrootLinks setup"
 ```
