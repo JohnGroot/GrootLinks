@@ -1,8 +1,31 @@
-﻿using Microsoft.Extensions.Hosting;
+using Anthropic;
+using Anthropic.Core;
+using GrootLinks.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using ModelContextProtocol.Server;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+var vaultPath = Environment.GetEnvironmentVariable("GROOTLINKS_VAULT_PATH")
+    ?? throw new InvalidOperationException(
+        "GROOTLINKS_VAULT_PATH environment variable is required. Set it to the absolute path of your vault directory.");
+
+var taxonomyPath = Path.Combine(vaultPath, "_taxonomy", "tags.json");
+var aliasesPath = Path.Combine(vaultPath, "_taxonomy", "tag_aliases.json");
+
+builder.Services.AddSingleton(new TaxonomyService(taxonomyPath, aliasesPath));
+builder.Services.AddSingleton(new VaultWriter(vaultPath));
+
+builder.Services.AddHttpClient<LinkParser>();
+
+builder.Services.AddSingleton(sp =>
+{
+    var apiKey = Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY")
+        ?? throw new InvalidOperationException("ANTHROPIC_API_KEY environment variable is required");
+    return new AnthropicClient(new ClientOptions { ApiKey = apiKey });
+});
+builder.Services.AddSingleton<TagClassifier>();
 
 builder.Services
     .AddMcpServer(options =>
