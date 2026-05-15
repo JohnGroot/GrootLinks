@@ -115,7 +115,7 @@ Tool classes use `[McpServerToolType]` at class level, `[McpServerTool]` on meth
 - Create: `tests/GrootLinks.Tests/GrootLinks.Tests.csproj`
 - Create: `vault/` as git submodule
 
-- [ ] **Step 1: Create .gitignore**
+- [x] **Step 1: Create .gitignore**
 
 ```gitignore
 # .NET
@@ -146,7 +146,7 @@ tools/migrate/export/
 Thumbs.db
 ```
 
-- [ ] **Step 2: Initialize vault as a separate git repo and add as submodule**
+- [x] **Step 2: Initialize vault as a separate git repo and add as submodule**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -158,7 +158,7 @@ git submodule add ./vault vault
 
 Note: The vault is a submodule so it can be synced/moved independently. For now it's a local repo; it can be pushed to a remote later.
 
-- [ ] **Step 3: Create the solution and projects**
+- [x] **Step 3: Create the solution and projects**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -170,7 +170,7 @@ dotnet sln add tests/GrootLinks.Tests/GrootLinks.Tests.csproj
 dotnet add tests/GrootLinks.Tests reference src/GrootLinks
 ```
 
-- [ ] **Step 4: Add NuGet dependencies to main project**
+- [x] **Step 4: Add NuGet dependencies to main project**
 
 ```bash
 cd ~/Dev/GrootLinks/src/GrootLinks
@@ -180,7 +180,7 @@ dotnet add package HtmlAgilityPack
 dotnet add package YamlDotNet
 ```
 
-- [ ] **Step 5: Add test dependencies**
+- [x] **Step 5: Add test dependencies**
 
 ```bash
 cd ~/Dev/GrootLinks/tests/GrootLinks.Tests
@@ -188,7 +188,7 @@ dotnet add package NSubstitute
 dotnet add package FluentAssertions
 ```
 
-- [ ] **Step 6: Write minimal Program.cs (MCP stdio server skeleton)**
+- [x] **Step 6: Write minimal Program.cs (MCP stdio server skeleton)**
 
 ```csharp
 using Microsoft.Extensions.Hosting;
@@ -214,12 +214,12 @@ var host = builder.Build();
 await host.RunAsync();
 ```
 
-- [ ] **Step 7: Verify it builds**
+- [x] **Step 7: Verify it builds**
 
 Run: `dotnet build` from repo root.
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 8: Create .env.example**
+- [x] **Step 8: Create .env.example**
 
 ```
 NOTION_TOKEN=your_notion_integration_token
@@ -227,7 +227,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 GROOTLINKS_VAULT_PATH=/absolute/path/to/vault
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add .gitignore .env.example GrootLinks.sln src/ tests/
@@ -245,7 +245,7 @@ git commit -m "feat: scaffold .NET 10 solution with MCP server skeleton"
 - Create: `vault/_taxonomy/tags.json` (starter taxonomy)
 - Create: `vault/_taxonomy/tag_aliases.json` (empty starter)
 
-- [ ] **Step 1: Create the Link model**
+- [x] **Step 1: Create the Link model**
 
 Create `src/GrootLinks/Models/Link.cs`:
 
@@ -265,7 +265,7 @@ public class Link
 }
 ```
 
-- [ ] **Step 2: Create starter tags.json**
+- [x] **Step 2: Create starter tags.json**
 
 Create `vault/_taxonomy/tags.json` — minimal starter taxonomy. This will be expanded by the `suggest-taxonomy` migration step:
 
@@ -342,7 +342,7 @@ Create `vault/_taxonomy/tags.json` — minimal starter taxonomy. This will be ex
 }
 ```
 
-- [ ] **Step 3: Create empty tag_aliases.json**
+- [x] **Step 3: Create empty tag_aliases.json**
 
 Create `vault/_taxonomy/tag_aliases.json`:
 
@@ -350,7 +350,7 @@ Create `vault/_taxonomy/tag_aliases.json`:
 {}
 ```
 
-- [ ] **Step 4: Write TaxonomyService tests**
+- [x] **Step 4: Write TaxonomyService tests**
 
 Create `tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs`:
 
@@ -464,12 +464,12 @@ public class TaxonomyServiceTests : IDisposable
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they fail**
+- [x] **Step 5: Run tests to verify they fail**
 
 Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: Compilation error — `TaxonomyService` does not exist.
 
-- [ ] **Step 6: Implement TaxonomyService**
+- [x] **Step 6: Implement TaxonomyService**
 
 Create `src/GrootLinks/Services/TaxonomyService.cs`:
 
@@ -545,12 +545,12 @@ public class TaxonomyService
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/GrootLinks/Models/ src/GrootLinks/Services/TaxonomyService.cs tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs
@@ -568,7 +568,7 @@ git commit -m "feat: add Link model and TaxonomyService with alias resolution"
 - Create: `tests/GrootLinks.Tests/Services/VaultWriterTests.cs`
 - Create: `vault/_templates/link.md`
 
-- [ ] **Step 1: Create the Obsidian link template**
+- [x] **Step 1: Create the Obsidian link template**
 
 Create `vault/_templates/link.md` (for Obsidian Templater reference):
 
@@ -587,7 +587,7 @@ needs_review: {{needs_review}}
 {{description}}
 ```
 
-- [ ] **Step 2: Write VaultWriter tests**
+- [x] **Step 2: Write VaultWriter tests**
 
 Create `tests/GrootLinks.Tests/Services/VaultWriterTests.cs`:
 
@@ -794,12 +794,12 @@ public class VaultWriterTests : IDisposable
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `dotnet test --filter "VaultWriterTests"`
 Expected: Compilation error — `VaultWriter` does not exist.
 
-- [ ] **Step 4: Implement VaultWriter**
+- [x] **Step 4: Implement VaultWriter**
 
 Create `src/GrootLinks/Services/VaultWriter.cs`:
 
@@ -1029,12 +1029,12 @@ public partial class VaultWriter
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `dotnet test --filter "VaultWriterTests"`
 Expected: All 10 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GrootLinks/Services/VaultWriter.cs tests/GrootLinks.Tests/Services/VaultWriterTests.cs
