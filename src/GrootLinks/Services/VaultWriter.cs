@@ -8,8 +8,15 @@ namespace GrootLinks.Services;
 
 public partial class VaultWriter
 {
+    private static readonly IDeserializer YamlDeserializer = new DeserializerBuilder()
+        .WithNamingConvention(UnderscoredNamingConvention.Instance)
+        .IgnoreUnmatchedProperties()
+        .Build();
+
     private readonly string _vaultDir;
     private readonly string _linksDir;
+    private readonly HashSet<string> _knownUrls = [];
+    private bool _urlIndexLoaded;
 
     public VaultWriter(string vaultDir)
     {
@@ -19,8 +26,8 @@ public partial class VaultWriter
 
     public async Task<string?> WriteLinkAsync(Link link)
     {
-        var existing = FindByUrl(link.Url);
-        if (existing != null) return null;
+        await EnsureUrlIndexAsync();
+        if (_knownUrls.Contains(link.Url)) return null;
 
         var yearDir = Path.Combine(_linksDir, link.Created.Year.ToString());
         Directory.CreateDirectory(yearDir);
@@ -39,6 +46,7 @@ public partial class VaultWriter
         var content = BuildMarkdown(link);
         await File.WriteAllTextAsync(filePath, content);
 
+        _knownUrls.Add(link.Url);
         link.FilePath = filePath;
         return filePath;
     }
@@ -101,18 +109,19 @@ public partial class VaultWriter
         return results;
     }
 
-    private string? FindByUrl(string url)
+    private async Task EnsureUrlIndexAsync()
     {
-        if (!Directory.Exists(_linksDir)) return null;
-
-        foreach (var file in Directory.EnumerateFiles(_linksDir, "*.md", SearchOption.AllDirectories))
+        if (_urlIndexLoaded) return;
+        if (Directory.Exists(_linksDir))
         {
-            var content = File.ReadAllText(file);
-            if (content.Contains($"\nurl: {url}\n") || content.Contains($"\nurl: {url}\r"))
-                return file;
+            foreach (var file in Directory.EnumerateFiles(_linksDir, "*.md", SearchOption.AllDirectories))
+            {
+                var link = await ReadLinkAsync(file);
+                if (link != null)
+                    _knownUrls.Add(link.Url);
+            }
         }
-
-        return null;
+        _urlIndexLoaded = true;
     }
 
     private static string BuildMarkdown(Link link)
@@ -120,7 +129,7 @@ public partial class VaultWriter
         var sb = new StringBuilder();
         sb.AppendLine("---");
         sb.AppendLine($"title: \"{link.Title.Replace("\"", "\\\"")}\"");
-        sb.AppendLine($"url: {link.Url}");
+        sb.AppendLine($"url: \"{link.Url}\"");
         if (link.Tags.Count > 0)
         {
             sb.AppendLine("tags:");
@@ -152,12 +161,7 @@ public partial class VaultWriter
         if (!frontmatterMatch.Success) return null;
 
         var yaml = frontmatterMatch.Groups[1].Value;
-        var deserializer = new DeserializerBuilder()
-            .WithNamingConvention(UnderscoredNamingConvention.Instance)
-            .IgnoreUnmatchedProperties()
-            .Build();
-
-        var dict = deserializer.Deserialize<Dictionary<string, object?>>(yaml);
+        var dict = YamlDeserializer.Deserialize<Dictionary<string, object?>>(yaml);
         if (dict == null) return null;
 
         var tags = new List<string>();

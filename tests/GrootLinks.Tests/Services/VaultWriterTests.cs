@@ -40,7 +40,7 @@ public class VaultWriterTests : IDisposable
         File.Exists(filePath).Should().BeTrue();
         var content = await File.ReadAllTextAsync(filePath!);
         content.Should().Contain("title: \"Test Link\"");
-        content.Should().Contain("url: https://example.com");
+        content.Should().Contain("url: \"https://example.com\"");
         content.Should().Contain("- programming");
         content.Should().Contain("- dotnet");
         content.Should().Contain("created: 2025-03-15");

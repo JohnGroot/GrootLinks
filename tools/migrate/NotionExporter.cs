@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace GrootLinks.Migrate;
 
-public class NotionExporter
+public class NotionExporter : IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _databaseId;
@@ -16,6 +16,8 @@ public class NotionExporter
         _http.DefaultRequestHeaders.Add("Notion-Version", "2022-06-28");
         _databaseId = databaseId;
     }
+
+    public void Dispose() => _http.Dispose();
 
     public async Task<List<NotionEntry>> ExportAllAsync(Action<string>? log = null)
     {

@@ -6,7 +6,8 @@ using GrootLinks.Migrate;
 var command = args.Length > 0 ? args[0] : "help";
 var notionToken = Environment.GetEnvironmentVariable("NOTION_TOKEN")
     ?? throw new InvalidOperationException("NOTION_TOKEN env var required");
-var databaseId = "79b34536-f152-4abb-a5e6-5ffce622a0bc";
+var databaseId = Environment.GetEnvironmentVariable("NOTION_DATABASE_ID")
+    ?? "79b34536-f152-4abb-a5e6-5ffce622a0bc";
 var exportDir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "export"));
 Directory.CreateDirectory(exportDir);
 var exportPath = Path.Combine(exportDir, "notion_export.json");
@@ -17,12 +18,14 @@ var vaultPath = Environment.GetEnvironmentVariable("GROOTLINKS_VAULT_PATH")
 switch (command)
 {
     case "export":
+    {
         Console.WriteLine("Exporting from Notion...");
-        var exporter = new NotionExporter(notionToken, databaseId);
+        using var exporter = new NotionExporter(notionToken, databaseId);
         var entries = await exporter.ExportAllAsync(Console.WriteLine);
         await NotionExporter.SaveToFileAsync(entries, exportPath);
         Console.WriteLine($"Exported {entries.Count} entries to {exportPath}");
         break;
+    }
 
     case "analyze":
         Console.WriteLine("Analyzing tags...");

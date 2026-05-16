@@ -7,13 +7,12 @@ public class TaxonomyService
     private readonly Dictionary<string, JsonElement> _taxonomy;
     private readonly Dictionary<string, string> _aliases;
     private readonly HashSet<string> _allSlugs;
-    private readonly string _tagsPath;
+    private readonly string _taxonomyRawJson;
 
     public TaxonomyService(string tagsPath, string aliasesPath)
     {
-        _tagsPath = tagsPath;
-        var tagsJson = File.ReadAllText(tagsPath);
-        _taxonomy = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(tagsJson)!;
+        _taxonomyRawJson = File.ReadAllText(tagsPath);
+        _taxonomy = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(_taxonomyRawJson)!;
 
         var aliasJson = File.ReadAllText(aliasesPath);
         _aliases = JsonSerializer.Deserialize<Dictionary<string, string>>(aliasJson)!;
@@ -42,7 +41,7 @@ public class TaxonomyService
 
     public string GetTaxonomyTreeJson()
     {
-        return File.ReadAllText(_tagsPath);
+        return _taxonomyRawJson;
     }
 
     public string GetTaxonomyTreeJson(string category)
@@ -60,7 +59,7 @@ public class TaxonomyService
             slugs.Add(key);
             if (value.ValueKind == JsonValueKind.Object)
             {
-                var children = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(value.GetRawText());
+                var children = value.Deserialize<Dictionary<string, JsonElement>>();
                 if (children != null)
                     CollectSlugs(children, slugs);
             }

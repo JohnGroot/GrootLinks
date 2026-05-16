@@ -35,8 +35,8 @@ public class LinkParser
     private static string ExtractTitle(HtmlDocument doc)
     {
         var ogTitle = doc.DocumentNode.SelectSingleNode("//meta[@property='og:title']")
-            ?.GetAttributeValue("content", null);
-        if (!string.IsNullOrWhiteSpace(ogTitle)) return ogTitle;
+            ?.GetAttributeValue("content", "");
+        if (!string.IsNullOrWhiteSpace(ogTitle)) return WebUtility.HtmlDecode(ogTitle);
 
         var title = doc.DocumentNode.SelectSingleNode("//title")?.InnerText?.Trim();
         if (!string.IsNullOrWhiteSpace(title)) return WebUtility.HtmlDecode(title);
@@ -50,12 +50,12 @@ public class LinkParser
     private static string? ExtractDescription(HtmlDocument doc)
     {
         var ogDesc = doc.DocumentNode.SelectSingleNode("//meta[@property='og:description']")
-            ?.GetAttributeValue("content", null);
-        if (!string.IsNullOrWhiteSpace(ogDesc)) return ogDesc;
+            ?.GetAttributeValue("content", "");
+        if (!string.IsNullOrWhiteSpace(ogDesc)) return WebUtility.HtmlDecode(ogDesc);
 
         var metaDesc = doc.DocumentNode.SelectSingleNode("//meta[@name='description']")
-            ?.GetAttributeValue("content", null);
-        return string.IsNullOrWhiteSpace(metaDesc) ? null : metaDesc;
+            ?.GetAttributeValue("content", "");
+        return string.IsNullOrWhiteSpace(metaDesc) ? null : WebUtility.HtmlDecode(metaDesc);
     }
 
     private static string ExtractBodyText(HtmlDocument doc)

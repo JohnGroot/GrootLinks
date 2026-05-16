@@ -125,13 +125,16 @@ public class VaultMigrator
             }
 
             migrationLog[entry.Url] = filePath;
-            await SaveMigrationLogAsync(migrationLog);
 
             log?.Invoke($"OK: {entry.Title} -> {Path.GetFileName(filePath)} [{string.Join(", ", resolvedTags)}]");
             report.Migrated++;
             if (needsReview) report.NeedsReview++;
+
+            if (report.Migrated % 25 == 0)
+                await SaveMigrationLogAsync(migrationLog);
         }
 
+        await SaveMigrationLogAsync(migrationLog);
         return report;
     }
 
