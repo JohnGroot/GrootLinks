@@ -1,5 +1,7 @@
 # GrootLinks Implementation Plan
 
+> **Current Status (2026-05-16):** Tasks 1–9 COMPLETE + code review fixes committed. Task 10 in progress — Steps 1-2 done (export + analyze). Blocked on Step 3: need `ANTHROPIC_API_KEY` env var set. Export data is at `tools/migrate/export/notion_export.json` (1,321 entries, 1,182 tagged, 580 unique tags). Branch: `feat/grootlinks-implementation`. Resume with `dotnet run --project tools/migrate -- suggest-taxonomy`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Migrate 1,321 links from Notion to an Obsidian vault with a clean hierarchical tag taxonomy, and build a .NET 10 MCP stdio server for ongoing AI-classified link ingestion.
@@ -2411,7 +2413,7 @@ git commit -m "chore: verify all tests pass before migration"
 
 This task executes the actual migration. Each step has a human review gate.
 
-- [ ] **Step 1: Export Notion database**
+- [x] **Step 1: Export Notion database**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -2421,7 +2423,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: `Exported 1321 entries to .../notion_export.json`
 
-- [ ] **Step 2: Analyze tags**
+- [x] **Step 2: Analyze tags**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
