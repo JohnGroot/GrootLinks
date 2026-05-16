@@ -3,9 +3,13 @@ using Anthropic.Core;
 using GrootLinks.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
 
 var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Warning);
+builder.Logging.AddFilter("ModelContextProtocol", LogLevel.Warning);
 
 var vaultPath = Environment.GetEnvironmentVariable("GROOTLINKS_VAULT_PATH")
     ?? throw new InvalidOperationException(
