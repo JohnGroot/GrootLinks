@@ -1,6 +1,6 @@
 # GrootLinks Implementation Plan
 
-> **Current Status (2026-05-16):** Tasks 1–9 COMPLETE + code review fixes committed. Task 10 in progress — Steps 1-2 done (export + analyze). Blocked on Step 3: need `ANTHROPIC_API_KEY` env var set. Export data is at `tools/migrate/export/notion_export.json` (1,321 entries, 1,182 tagged, 580 unique tags). Branch: `feat/grootlinks-implementation`. Resume with `dotnet run --project tools/migrate -- suggest-taxonomy`.
+> **Current Status (2026-05-16):** Tasks 1–10 COMPLETE. Migration done: 1,274 links migrated to vault (32 skipped — no URL, 15 duplicates). 132 entries marked `needs_review: true`. Task 11 next — Obsidian verification and MCP server testing. Branch: `feat/grootlinks-implementation`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -2432,7 +2432,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: Tag stats printed, full report saved.
 
-- [ ] **Step 3: AI-suggest taxonomy expansion (two-pass step 1)**
+- [x] **Step 3: AI-suggest taxonomy expansion (two-pass step 1)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2441,7 +2441,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: `suggested_tags.json` created in export dir.
 
-- [ ] **Step 4: HUMAN REVIEW GATE — Expand taxonomy**
+- [x] **Step 4: HUMAN REVIEW GATE — Expand taxonomy**
 
 Open `tools/migrate/export/suggested_tags.json`. Review the AI-suggested expansion. Edit as needed. When satisfied, copy to `vault/_taxonomy/tags.json`:
 
@@ -2454,7 +2454,7 @@ Commit in vault submodule:
 cd vault && git add _taxonomy/tags.json && git commit -m "feat: expand taxonomy from AI suggestions" && cd ..
 ```
 
-- [ ] **Step 5: Generate aliases (two-pass step 2)**
+- [x] **Step 5: Generate aliases (two-pass step 2)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2463,7 +2463,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: `tag_aliases.json` updated with mappings for all 500+ tags.
 
-- [ ] **Step 6: HUMAN REVIEW GATE — Edit aliases**
+- [x] **Step 6: HUMAN REVIEW GATE — Edit aliases**
 
 Open `vault/_taxonomy/tag_aliases.json`. Review/edit the mappings. Commit:
 
@@ -2471,7 +2471,7 @@ Open `vault/_taxonomy/tag_aliases.json`. Review/edit the mappings. Commit:
 cd vault && git add _taxonomy/tag_aliases.json && git commit -m "feat: add reviewed tag aliases" && cd ..
 ```
 
-- [ ] **Step 7: Run migration (tagged entries only)**
+- [x] **Step 7: Run migration (tagged entries only)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
@@ -2480,7 +2480,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: ~1,182 tagged entries migrated. ~139 untagged skipped (no AI yet).
 
-- [ ] **Step 8: Run migration with AI classification for untagged**
+- [x] **Step 8: Run migration with AI classification for untagged**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2489,7 +2489,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: Processes remaining untagged entries. Dead URLs fall back to title-only classification. All AI-classified entries marked `needs_review: true`.
 
-- [ ] **Step 9: Verify vault structure**
+- [x] **Step 9: Verify vault structure**
 
 ```bash
 find ~/Dev/GrootLinks/vault/links -type f -name "*.md" | wc -l
@@ -2498,7 +2498,7 @@ ls ~/Dev/GrootLinks/vault/links/
 
 Expected: ~1,321 .md files across year directories (2019-2025).
 
-- [ ] **Step 10: Commit vault**
+- [x] **Step 10: Commit vault**
 
 ```bash
 cd vault && git add links/ && git commit -m "feat: migrate 1,321 links from Notion" && cd ..
@@ -2510,14 +2510,14 @@ git commit -m "feat: update vault submodule with migrated links"
 
 ## Task 11: Verification & Obsidian Setup
 
-- [ ] **Step 1: Open vault in Obsidian**
+- [x] **Step 1: Open vault in Obsidian**
 
 Open Obsidian → "Open folder as vault" → select `~/Dev/GrootLinks/vault/`. Verify:
 - Links appear under `links/YYYY/`
 - Frontmatter renders in properties view
 - Tags are searchable
 
-- [ ] **Step 2: Restart Claude Code and test MCP server**
+- [x] **Step 2: Restart Claude Code and test MCP server**
 
 Restart Claude Code to pick up the MCP config. Test:
 - `save_link` with a test URL
