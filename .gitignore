@@ -21,6 +21,9 @@ appsettings.*.json
 # Notion export cache
 tools/migrate/export/
 
+# Superpowers brainstorm sessions
+.superpowers/
+
 # OS
 .DS_Store
 Thumbs.db
