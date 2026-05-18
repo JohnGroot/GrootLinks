@@ -14,10 +14,23 @@ public class LinkParser
         _httpClient = httpClient;
     }
 
+    private const int MaxResponseBytes = 5 * 1024 * 1024;
+
     public async Task<ParsedPage> FetchAndParseAsync(string url)
     {
-        var response = await _httpClient.GetStringAsync(url);
-        return ExtractFromHtml(response);
+        using var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        if (response.Content.Headers.ContentLength > MaxResponseBytes)
+            throw new InvalidOperationException($"Response too large ({response.Content.Headers.ContentLength} bytes).");
+
+        var stream = await response.Content.ReadAsStreamAsync();
+        using var reader = new StreamReader(stream);
+        var buffer = new char[MaxResponseBytes];
+        var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
+        var html = new string(buffer, 0, charsRead);
+
+        return ExtractFromHtml(html);
     }
 
     public static ParsedPage ExtractFromHtml(string html)

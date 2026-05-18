@@ -18,6 +18,9 @@ public class SaveLinkTool
         [Description("Optional manual tags to include (in addition to AI-suggested tags)")] string[]? tags = null,
         [Description("Optional title override (otherwise extracted from page)")] string? title = null)
     {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || (uri.Scheme != "http" && uri.Scheme != "https"))
+            return "Error: URL must be an absolute HTTP or HTTPS URL.";
+
         var page = await parser.FetchAndParseAsync(url);
         var aiTags = await classifier.ClassifyAsync(page.Title, page.Description, page.BodyText);
 

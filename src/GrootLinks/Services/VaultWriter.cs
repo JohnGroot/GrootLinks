@@ -53,16 +53,19 @@ public partial class VaultWriter
 
     public async Task<Link?> ReadLinkAsync(string filePath)
     {
-        if (!File.Exists(filePath)) return null;
+        var fullPath = Path.GetFullPath(filePath);
+        if (!fullPath.StartsWith(_linksDir + Path.DirectorySeparatorChar))
+            throw new ArgumentException("File path must be inside the vault links directory.");
+        if (!File.Exists(fullPath)) return null;
 
-        var content = await File.ReadAllTextAsync(filePath);
-        return ParseMarkdown(content, filePath);
+        var content = await File.ReadAllTextAsync(fullPath);
+        return ParseMarkdown(content, fullPath);
     }
 
     public async Task UpdateLinkTagsAsync(string filePath, List<string> newTags, bool clearReview = false)
     {
         var link = await ReadLinkAsync(filePath);
-        if (link == null) return;
+        if (link == null) throw new FileNotFoundException("Link file not found.", filePath);
 
         link.Tags = newTags;
         if (clearReview) link.NeedsReview = false;
