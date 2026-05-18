@@ -1,5 +1,7 @@
 # GrootLinks Implementation Plan
 
+> **Current Status (2026-05-16):** Tasks 1–10 COMPLETE. Migration done: 1,274 links migrated to vault (32 skipped — no URL, 15 duplicates). 132 entries marked `needs_review: true`. Task 11 next — Obsidian verification and MCP server testing. Branch: `feat/grootlinks-implementation`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Migrate 1,321 links from Notion to an Obsidian vault with a clean hierarchical tag taxonomy, and build a .NET 10 MCP stdio server for ongoing AI-classified link ingestion.
@@ -115,7 +117,7 @@ Tool classes use `[McpServerToolType]` at class level, `[McpServerTool]` on meth
 - Create: `tests/GrootLinks.Tests/GrootLinks.Tests.csproj`
 - Create: `vault/` as git submodule
 
-- [ ] **Step 1: Create .gitignore**
+- [x] **Step 1: Create .gitignore**
 
 ```gitignore
 # .NET
@@ -146,7 +148,7 @@ tools/migrate/export/
 Thumbs.db
 ```
 
-- [ ] **Step 2: Initialize vault as a separate git repo and add as submodule**
+- [x] **Step 2: Initialize vault as a separate git repo and add as submodule**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -158,7 +160,7 @@ git submodule add ./vault vault
 
 Note: The vault is a submodule so it can be synced/moved independently. For now it's a local repo; it can be pushed to a remote later.
 
-- [ ] **Step 3: Create the solution and projects**
+- [x] **Step 3: Create the solution and projects**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -170,7 +172,7 @@ dotnet sln add tests/GrootLinks.Tests/GrootLinks.Tests.csproj
 dotnet add tests/GrootLinks.Tests reference src/GrootLinks
 ```
 
-- [ ] **Step 4: Add NuGet dependencies to main project**
+- [x] **Step 4: Add NuGet dependencies to main project**
 
 ```bash
 cd ~/Dev/GrootLinks/src/GrootLinks
@@ -180,7 +182,7 @@ dotnet add package HtmlAgilityPack
 dotnet add package YamlDotNet
 ```
 
-- [ ] **Step 5: Add test dependencies**
+- [x] **Step 5: Add test dependencies**
 
 ```bash
 cd ~/Dev/GrootLinks/tests/GrootLinks.Tests
@@ -188,7 +190,7 @@ dotnet add package NSubstitute
 dotnet add package FluentAssertions
 ```
 
-- [ ] **Step 6: Write minimal Program.cs (MCP stdio server skeleton)**
+- [x] **Step 6: Write minimal Program.cs (MCP stdio server skeleton)**
 
 ```csharp
 using Microsoft.Extensions.Hosting;
@@ -214,12 +216,12 @@ var host = builder.Build();
 await host.RunAsync();
 ```
 
-- [ ] **Step 7: Verify it builds**
+- [x] **Step 7: Verify it builds**
 
 Run: `dotnet build` from repo root.
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 8: Create .env.example**
+- [x] **Step 8: Create .env.example**
 
 ```
 NOTION_TOKEN=your_notion_integration_token
@@ -227,7 +229,7 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 GROOTLINKS_VAULT_PATH=/absolute/path/to/vault
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add .gitignore .env.example GrootLinks.sln src/ tests/
@@ -245,7 +247,7 @@ git commit -m "feat: scaffold .NET 10 solution with MCP server skeleton"
 - Create: `vault/_taxonomy/tags.json` (starter taxonomy)
 - Create: `vault/_taxonomy/tag_aliases.json` (empty starter)
 
-- [ ] **Step 1: Create the Link model**
+- [x] **Step 1: Create the Link model**
 
 Create `src/GrootLinks/Models/Link.cs`:
 
@@ -265,7 +267,7 @@ public class Link
 }
 ```
 
-- [ ] **Step 2: Create starter tags.json**
+- [x] **Step 2: Create starter tags.json**
 
 Create `vault/_taxonomy/tags.json` — minimal starter taxonomy. This will be expanded by the `suggest-taxonomy` migration step:
 
@@ -342,7 +344,7 @@ Create `vault/_taxonomy/tags.json` — minimal starter taxonomy. This will be ex
 }
 ```
 
-- [ ] **Step 3: Create empty tag_aliases.json**
+- [x] **Step 3: Create empty tag_aliases.json**
 
 Create `vault/_taxonomy/tag_aliases.json`:
 
@@ -350,7 +352,7 @@ Create `vault/_taxonomy/tag_aliases.json`:
 {}
 ```
 
-- [ ] **Step 4: Write TaxonomyService tests**
+- [x] **Step 4: Write TaxonomyService tests**
 
 Create `tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs`:
 
@@ -464,12 +466,12 @@ public class TaxonomyServiceTests : IDisposable
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they fail**
+- [x] **Step 5: Run tests to verify they fail**
 
 Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: Compilation error — `TaxonomyService` does not exist.
 
-- [ ] **Step 6: Implement TaxonomyService**
+- [x] **Step 6: Implement TaxonomyService**
 
 Create `src/GrootLinks/Services/TaxonomyService.cs`:
 
@@ -545,12 +547,12 @@ public class TaxonomyService
 }
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+- [x] **Step 7: Run tests to verify they pass**
 
 Run: `dotnet test --filter "TaxonomyServiceTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/GrootLinks/Models/ src/GrootLinks/Services/TaxonomyService.cs tests/GrootLinks.Tests/Services/TaxonomyServiceTests.cs
@@ -568,7 +570,7 @@ git commit -m "feat: add Link model and TaxonomyService with alias resolution"
 - Create: `tests/GrootLinks.Tests/Services/VaultWriterTests.cs`
 - Create: `vault/_templates/link.md`
 
-- [ ] **Step 1: Create the Obsidian link template**
+- [x] **Step 1: Create the Obsidian link template**
 
 Create `vault/_templates/link.md` (for Obsidian Templater reference):
 
@@ -587,7 +589,7 @@ needs_review: {{needs_review}}
 {{description}}
 ```
 
-- [ ] **Step 2: Write VaultWriter tests**
+- [x] **Step 2: Write VaultWriter tests**
 
 Create `tests/GrootLinks.Tests/Services/VaultWriterTests.cs`:
 
@@ -794,12 +796,12 @@ public class VaultWriterTests : IDisposable
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `dotnet test --filter "VaultWriterTests"`
 Expected: Compilation error — `VaultWriter` does not exist.
 
-- [ ] **Step 4: Implement VaultWriter**
+- [x] **Step 4: Implement VaultWriter**
 
 Create `src/GrootLinks/Services/VaultWriter.cs`:
 
@@ -1029,12 +1031,12 @@ public partial class VaultWriter
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `dotnet test --filter "VaultWriterTests"`
 Expected: All 10 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/GrootLinks/Services/VaultWriter.cs tests/GrootLinks.Tests/Services/VaultWriterTests.cs
@@ -1051,7 +1053,7 @@ git commit -m "feat: add VaultWriter with markdown frontmatter read/write/search
 - Create: `src/GrootLinks/Services/LinkParser.cs`
 - Create: `tests/GrootLinks.Tests/Services/LinkParserTests.cs`
 
-- [ ] **Step 1: Write LinkParser tests**
+- [x] **Step 1: Write LinkParser tests**
 
 Create `tests/GrootLinks.Tests/Services/LinkParserTests.cs`:
 
@@ -1139,12 +1141,12 @@ public class LinkParserTests
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test --filter "LinkParserTests"`
 Expected: Compilation error — `LinkParser` does not exist.
 
-- [ ] **Step 3: Implement LinkParser**
+- [x] **Step 3: Implement LinkParser**
 
 Create `src/GrootLinks/Services/LinkParser.cs`:
 
@@ -1233,12 +1235,12 @@ public class LinkParser
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test --filter "LinkParserTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/GrootLinks/Services/LinkParser.cs tests/GrootLinks.Tests/Services/LinkParserTests.cs
@@ -1253,7 +1255,7 @@ git commit -m "feat: add LinkParser for URL content extraction"
 - Create: `src/GrootLinks/Services/TagClassifier.cs`
 - Create: `tests/GrootLinks.Tests/Services/TagClassifierTests.cs`
 
-- [ ] **Step 1: Write TagClassifier tests**
+- [x] **Step 1: Write TagClassifier tests**
 
 Create `tests/GrootLinks.Tests/Services/TagClassifierTests.cs`:
 
@@ -1322,12 +1324,12 @@ public class TagClassifierTests
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `dotnet test --filter "TagClassifierTests"`
 Expected: Compilation error — `TagClassifier` does not exist.
 
-- [ ] **Step 3: Implement TagClassifier**
+- [x] **Step 3: Implement TagClassifier**
 
 Create `src/GrootLinks/Services/TagClassifier.cs`:
 
@@ -1414,12 +1416,12 @@ public partial class TagClassifier
 
 Note: The regex `\[(?:\s*"[^"]*"\s*,?\s*)*\]` matches JSON arrays of strings including empty arrays, single-element arrays, and multi-element arrays.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `dotnet test --filter "TagClassifierTests"`
 Expected: All 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/GrootLinks/Services/TagClassifier.cs tests/GrootLinks.Tests/Services/TagClassifierTests.cs
@@ -1438,7 +1440,7 @@ git commit -m "feat: add TagClassifier with Claude API integration"
 - Create: `src/GrootLinks/Tools/ReviewQueueTool.cs`
 - Modify: `src/GrootLinks/Program.cs`
 
-- [ ] **Step 1: Implement SaveLinkTool**
+- [x] **Step 1: Implement SaveLinkTool**
 
 Create `src/GrootLinks/Tools/SaveLinkTool.cs`:
 
@@ -1490,7 +1492,7 @@ public class SaveLinkTool
 }
 ```
 
-- [ ] **Step 2: Implement SearchLinksTool**
+- [x] **Step 2: Implement SearchLinksTool**
 
 Create `src/GrootLinks/Tools/SearchLinksTool.cs`:
 
@@ -1532,7 +1534,7 @@ public class SearchLinksTool
 }
 ```
 
-- [ ] **Step 3: Implement ListTagsTool**
+- [x] **Step 3: Implement ListTagsTool**
 
 Create `src/GrootLinks/Tools/ListTagsTool.cs`:
 
@@ -1560,7 +1562,7 @@ public class ListTagsTool
 }
 ```
 
-- [ ] **Step 4: Implement RetagLinkTool**
+- [x] **Step 4: Implement RetagLinkTool**
 
 Create `src/GrootLinks/Tools/RetagLinkTool.cs`:
 
@@ -1595,7 +1597,7 @@ public class RetagLinkTool
 }
 ```
 
-- [ ] **Step 5: Implement ReviewQueueTool**
+- [x] **Step 5: Implement ReviewQueueTool**
 
 Create `src/GrootLinks/Tools/ReviewQueueTool.cs`:
 
@@ -1635,7 +1637,7 @@ public class ReviewQueueTool
 }
 ```
 
-- [ ] **Step 6: Update Program.cs with correct DI registration**
+- [x] **Step 6: Update Program.cs with correct DI registration**
 
 Replace `src/GrootLinks/Program.cs`:
 
@@ -1689,12 +1691,12 @@ await host.RunAsync();
 
 Note: `AddHttpClient<LinkParser>()` registers `LinkParser` as a typed HTTP client, which means the DI container will automatically inject an `HttpClient` instance into its constructor.
 
-- [ ] **Step 7: Verify it builds**
+- [x] **Step 7: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded with 0 errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/GrootLinks/Tools/ src/GrootLinks/Program.cs
@@ -1711,7 +1713,7 @@ git commit -m "feat: add MCP tools and wire DI for all services"
 - Create: `tools/migrate/NotionExporter.cs`
 - Create: `tools/migrate/TagAnalyzer.cs`
 
-- [ ] **Step 1: Create the migration project**
+- [x] **Step 1: Create the migration project**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -1723,7 +1725,7 @@ dotnet add package Anthropic
 dotnet add package System.Text.Json
 ```
 
-- [ ] **Step 2: Implement NotionExporter**
+- [x] **Step 2: Implement NotionExporter**
 
 Create `tools/migrate/NotionExporter.cs`:
 
@@ -1861,7 +1863,7 @@ public class NotionEntry
 }
 ```
 
-- [ ] **Step 3: Implement TagAnalyzer**
+- [x] **Step 3: Implement TagAnalyzer**
 
 Create `tools/migrate/TagAnalyzer.cs`:
 
@@ -2010,7 +2012,7 @@ public class TagAnalysisReport
 public record TagFrequency(string Tag, int Count);
 ```
 
-- [ ] **Step 4: Implement migration Program.cs**
+- [x] **Step 4: Implement migration Program.cs**
 
 Replace `tools/migrate/Program.cs`:
 
@@ -2110,12 +2112,12 @@ switch (command)
 }
 ```
 
-- [ ] **Step 5: Verify it builds**
+- [x] **Step 5: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add tools/migrate/
@@ -2130,7 +2132,7 @@ git commit -m "feat: add Notion export, tag analysis, and taxonomy suggestion to
 - Create: `tools/migrate/VaultMigrator.cs`
 - Modify: `tools/migrate/Program.cs` (add `migrate` command)
 
-- [ ] **Step 1: Implement VaultMigrator**
+- [x] **Step 1: Implement VaultMigrator**
 
 Create `tools/migrate/VaultMigrator.cs`:
 
@@ -2300,7 +2302,7 @@ public class MigrationReport
 }
 ```
 
-- [ ] **Step 2: Add `migrate` command to Program.cs**
+- [x] **Step 2: Add `migrate` command to Program.cs**
 
 Add this case to the switch statement in `tools/migrate/Program.cs`, before the `default` case:
 
@@ -2344,12 +2346,12 @@ Add this case to the switch statement in `tools/migrate/Program.cs`, before the 
         break;
 ```
 
-- [ ] **Step 3: Verify it builds**
+- [x] **Step 3: Verify it builds**
 
 Run: `dotnet build`
 Expected: Build succeeded.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add tools/migrate/VaultMigrator.cs tools/migrate/Program.cs
@@ -2365,7 +2367,7 @@ git commit -m "feat: add vault migrator with migration log and title-only fallba
 
 Note: `.claude/` is in `.gitignore` so this file is local-only.
 
-- [ ] **Step 1: Configure the MCP servers**
+- [x] **Step 1: Configure the MCP servers**
 
 Create/update `.claude/settings.json`:
 
@@ -2393,12 +2395,12 @@ Create/update `.claude/settings.json`:
 
 Note: Using absolute path for `GROOTLINKS_VAULT_PATH` to avoid working-directory ambiguity.
 
-- [ ] **Step 2: Run the full test suite**
+- [x] **Step 2: Run the full test suite**
 
 Run: `dotnet test --verbosity normal`
 Expected: All tests pass.
 
-- [ ] **Step 3: Commit (tests only, settings is gitignored)**
+- [x] **Step 3: Commit (tests only, settings is gitignored)**
 
 ```bash
 git add -A
@@ -2411,7 +2413,7 @@ git commit -m "chore: verify all tests pass before migration"
 
 This task executes the actual migration. Each step has a human review gate.
 
-- [ ] **Step 1: Export Notion database**
+- [x] **Step 1: Export Notion database**
 
 ```bash
 cd ~/Dev/GrootLinks
@@ -2421,7 +2423,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: `Exported 1321 entries to .../notion_export.json`
 
-- [ ] **Step 2: Analyze tags**
+- [x] **Step 2: Analyze tags**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
@@ -2430,7 +2432,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: Tag stats printed, full report saved.
 
-- [ ] **Step 3: AI-suggest taxonomy expansion (two-pass step 1)**
+- [x] **Step 3: AI-suggest taxonomy expansion (two-pass step 1)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2439,7 +2441,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: `suggested_tags.json` created in export dir.
 
-- [ ] **Step 4: HUMAN REVIEW GATE — Expand taxonomy**
+- [x] **Step 4: HUMAN REVIEW GATE — Expand taxonomy**
 
 Open `tools/migrate/export/suggested_tags.json`. Review the AI-suggested expansion. Edit as needed. When satisfied, copy to `vault/_taxonomy/tags.json`:
 
@@ -2452,7 +2454,7 @@ Commit in vault submodule:
 cd vault && git add _taxonomy/tags.json && git commit -m "feat: expand taxonomy from AI suggestions" && cd ..
 ```
 
-- [ ] **Step 5: Generate aliases (two-pass step 2)**
+- [x] **Step 5: Generate aliases (two-pass step 2)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2461,7 +2463,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: `tag_aliases.json` updated with mappings for all 500+ tags.
 
-- [ ] **Step 6: HUMAN REVIEW GATE — Edit aliases**
+- [x] **Step 6: HUMAN REVIEW GATE — Edit aliases**
 
 Open `vault/_taxonomy/tag_aliases.json`. Review/edit the mappings. Commit:
 
@@ -2469,7 +2471,7 @@ Open `vault/_taxonomy/tag_aliases.json`. Review/edit the mappings. Commit:
 cd vault && git add _taxonomy/tag_aliases.json && git commit -m "feat: add reviewed tag aliases" && cd ..
 ```
 
-- [ ] **Step 7: Run migration (tagged entries only)**
+- [x] **Step 7: Run migration (tagged entries only)**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
@@ -2478,7 +2480,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault \
 
 Expected: ~1,182 tagged entries migrated. ~139 untagged skipped (no AI yet).
 
-- [ ] **Step 8: Run migration with AI classification for untagged**
+- [x] **Step 8: Run migration with AI classification for untagged**
 
 ```bash
 NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
@@ -2487,7 +2489,7 @@ NOTION_TOKEN=$NOTION_TOKEN GROOTLINKS_VAULT_PATH=$PWD/vault ANTHROPIC_API_KEY=$A
 
 Expected: Processes remaining untagged entries. Dead URLs fall back to title-only classification. All AI-classified entries marked `needs_review: true`.
 
-- [ ] **Step 9: Verify vault structure**
+- [x] **Step 9: Verify vault structure**
 
 ```bash
 find ~/Dev/GrootLinks/vault/links -type f -name "*.md" | wc -l
@@ -2496,7 +2498,7 @@ ls ~/Dev/GrootLinks/vault/links/
 
 Expected: ~1,321 .md files across year directories (2019-2025).
 
-- [ ] **Step 10: Commit vault**
+- [x] **Step 10: Commit vault**
 
 ```bash
 cd vault && git add links/ && git commit -m "feat: migrate 1,321 links from Notion" && cd ..
@@ -2508,14 +2510,14 @@ git commit -m "feat: update vault submodule with migrated links"
 
 ## Task 11: Verification & Obsidian Setup
 
-- [ ] **Step 1: Open vault in Obsidian**
+- [x] **Step 1: Open vault in Obsidian**
 
 Open Obsidian → "Open folder as vault" → select `~/Dev/GrootLinks/vault/`. Verify:
 - Links appear under `links/YYYY/`
 - Frontmatter renders in properties view
 - Tags are searchable
 
-- [ ] **Step 2: Restart Claude Code and test MCP server**
+- [x] **Step 2: Restart Claude Code and test MCP server**
 
 Restart Claude Code to pick up the MCP config. Test:
 - `save_link` with a test URL
